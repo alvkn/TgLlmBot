@@ -15,10 +15,14 @@ using ModelContextProtocol.Client;
 using OpenAI;
 using OpenAI.Chat;
 using Telegram.Bot;
+using TgLlmBot.BackgroundServices;
 using TgLlmBot.Commands.ChatWithLlm;
 using TgLlmBot.Commands.ChatWithLlm.BackgroundServices.LlmRequests;
 using TgLlmBot.Commands.ChatWithLlm.Services;
 using TgLlmBot.Commands.DisplayHelp;
+using TgLlmBot.Commands.Model;
+using TgLlmBot.Commands.Ping;
+using TgLlmBot.Commands.Repo;
 using TgLlmBot.Configuration.Options;
 using TgLlmBot.Configuration.TypedConfiguration;
 using TgLlmBot.DataAccess;
@@ -142,6 +146,10 @@ public partial class Program
         builder.Services.AddSingleton(new DisplayHelpCommandHandlerOptions(config.Telegram.BotName));
         builder.Services.AddSingleton<DisplayHelpCommandHandler>();
         builder.Services.AddSingleton<ChatWithLlmCommandHandler>();
+        builder.Services.AddSingleton(new ModelCommandHandlerOptions(config.Llm.Endpoint.ToString(), config.Llm.Model));
+        builder.Services.AddSingleton<ModelCommandHandler>();
+        builder.Services.AddSingleton<PingCommandHandler>();
+        builder.Services.AddSingleton<RepoCommandHandler>();
         // Channel to communicate with LLM
         var llmRequestChannel = Channel.CreateBounded<ChatWithLlmCommand>(new BoundedChannelOptions(20)
         {
@@ -159,6 +167,7 @@ public partial class Program
         builder.Services.AddSingleton(llmRequestChannel.Reader);
         // Background services
         builder.Services.AddHostedService<LlmRequestsBackgroundService>();
+        builder.Services.AddHostedService<CleanupOldMessagesBackgroundService>();
 
         // LLM
         builder.Services.AddSingleton(new OpenAIClient(
@@ -212,6 +221,7 @@ public partial class Program
                 var githubFactory = resolver.GetRequiredService<IGithubMcpClientFactory>();
                 return githubFactory.CreateAsync(CancellationToken.None).GetAwaiter().GetResult();
             });
+
         return builder;
     }
 

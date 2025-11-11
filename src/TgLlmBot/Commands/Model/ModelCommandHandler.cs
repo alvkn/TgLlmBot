@@ -7,26 +7,26 @@ using Telegram.Bot.Types.Enums;
 using TgLlmBot.Services.Telegram.CommandDispatcher.Abstractions;
 using TgLlmBot.Services.Telegram.Markdown;
 
-namespace TgLlmBot.Commands.DisplayHelp;
+namespace TgLlmBot.Commands.Model;
 
-public class DisplayHelpCommandHandler : AbstractCommandHandler<DisplayHelpCommand>
+public class ModelCommandHandler : AbstractCommandHandler<ModelCommand>
 {
     private readonly TelegramBotClient _bot;
     private readonly string _response;
 
-    public DisplayHelpCommandHandler(
-        DisplayHelpCommandHandlerOptions options,
+    public ModelCommandHandler(
+        ModelCommandHandlerOptions options,
         TelegramBotClient bot,
         ITelegramMarkdownConverter markdownConverter)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(bot);
         ArgumentNullException.ThrowIfNull(markdownConverter);
-        _response = BuildHelpTemplate(markdownConverter, options.BotName);
+        _response = BuildResponseTemplate(markdownConverter, options.Model, options.Endpoint);
         _bot = bot;
     }
 
-    public override async Task HandleAsync(DisplayHelpCommand command, CancellationToken cancellationToken)
+    public override async Task HandleAsync(ModelCommand command, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(command);
@@ -41,14 +41,11 @@ public class DisplayHelpCommandHandler : AbstractCommandHandler<DisplayHelpComma
             cancellationToken: cancellationToken);
     }
 
-    private static string BuildHelpTemplate(ITelegramMarkdownConverter markdownConverter, string botName)
+    private static string BuildResponseTemplate(ITelegramMarkdownConverter markdownConverter, string model, string endpoint)
     {
         var builder = new StringBuilder();
-        builder.Append('`').Append(botName).Append('`').AppendLine(" - префикс для того чтобы задать вопрос LLM");
-        builder.AppendLine();
-        builder.AppendLine("`!ping` - проверка работоспособности бота");
-        builder.AppendLine("`!model` - отображает текущую используемую LLM и endpoint к которому идут обращения");
-        builder.AppendLine("`!repo` - ссылка на GitHub репозиторий с исходным кодом бота");
+        builder.Append("Провайдер: `").Append(endpoint).AppendLine("`");
+        builder.Append("Модель: `").Append(model).AppendLine("`");
         var rawMarkdown = builder.ToString();
         var optimizedMarkdown = markdownConverter.ConvertToTelegramMarkdown(rawMarkdown);
         return optimizedMarkdown;

@@ -6,6 +6,9 @@ using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using TgLlmBot.Commands.ChatWithLlm;
 using TgLlmBot.Commands.DisplayHelp;
+using TgLlmBot.Commands.Model;
+using TgLlmBot.Commands.Ping;
+using TgLlmBot.Commands.Repo;
 using TgLlmBot.Services.DataAccess;
 using TgLlmBot.Services.Telegram.SelfInformation;
 
@@ -22,26 +25,39 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
     private readonly ChatWithLlmCommandHandler _chatWithLlmCommandHandler;
     private readonly DisplayHelpCommandHandler _displayHelpCommandHandler;
     private readonly ITelegramMessageStorage _messageStorage;
+    private readonly ModelCommandHandler _modelCommandHandler;
+
     private readonly DefaultTelegramCommandDispatcherOptions _options;
+    private readonly PingCommandHandler _pingCommandHandler;
+    private readonly RepoCommandHandler _repoCommandHandler;
     private readonly ITelegramSelfInformation _selfInformation;
 
     public DefaultTelegramCommandDispatcher(
         DefaultTelegramCommandDispatcherOptions options,
         ITelegramSelfInformation selfInformation,
+        ITelegramMessageStorage messageStorage,
         DisplayHelpCommandHandler displayHelpCommandHandler,
         ChatWithLlmCommandHandler chatWithLlmCommandHandler,
-        ITelegramMessageStorage messageStorage)
+        PingCommandHandler pingCommandHandler,
+        RepoCommandHandler repoCommandHandler,
+        ModelCommandHandler modelCommandHandler)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(selfInformation);
+        ArgumentNullException.ThrowIfNull(messageStorage);
         ArgumentNullException.ThrowIfNull(displayHelpCommandHandler);
         ArgumentNullException.ThrowIfNull(chatWithLlmCommandHandler);
-        ArgumentNullException.ThrowIfNull(messageStorage);
+        ArgumentNullException.ThrowIfNull(pingCommandHandler);
+        ArgumentNullException.ThrowIfNull(repoCommandHandler);
+        ArgumentNullException.ThrowIfNull(modelCommandHandler);
         _options = options;
         _selfInformation = selfInformation;
+        _messageStorage = messageStorage;
         _displayHelpCommandHandler = displayHelpCommandHandler;
         _chatWithLlmCommandHandler = chatWithLlmCommandHandler;
-        _messageStorage = messageStorage;
+        _pingCommandHandler = pingCommandHandler;
+        _repoCommandHandler = repoCommandHandler;
+        _modelCommandHandler = modelCommandHandler;
     }
 
     public async Task HandleMessageAsync(Message? message, UpdateType type, CancellationToken cancellationToken)
@@ -60,12 +76,30 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
 
         var self = _selfInformation.GetSelf();
         await _messageStorage.StoreMessageAsync(message, self, cancellationToken);
-        switch (message.Text)
+        switch (message.Text?.Trim()?.ToLowerInvariant())
         {
             case "!help":
                 {
                     var command = new DisplayHelpCommand(message, type);
                     await _displayHelpCommandHandler.HandleAsync(command, cancellationToken);
+                    return;
+                }
+            case "!ping":
+                {
+                    var command = new PingCommand(message, type);
+                    await _pingCommandHandler.HandleAsync(command, cancellationToken);
+                    return;
+                }
+            case "!repo":
+                {
+                    var command = new RepoCommand(message, type);
+                    await _repoCommandHandler.HandleAsync(command, cancellationToken);
+                    return;
+                }
+            case "!model":
+                {
+                    var command = new ModelCommand(message, type);
+                    await _modelCommandHandler.HandleAsync(command, cancellationToken);
                     return;
                 }
         }
