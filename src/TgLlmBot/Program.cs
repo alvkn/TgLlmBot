@@ -36,6 +36,7 @@ using TgLlmBot.Services.Telegram.CommandDispatcher;
 using TgLlmBot.Services.Telegram.Markdown;
 using TgLlmBot.Services.Telegram.RequestHandler;
 using TgLlmBot.Services.Telegram.SelfInformation;
+using TgLlmBot.Services.Telegram.TypingStatus;
 
 namespace TgLlmBot;
 
@@ -165,9 +166,26 @@ public partial class Program
             return llmRequestChannel.Writer;
         });
         builder.Services.AddSingleton(llmRequestChannel.Reader);
+        builder.Services.AddSingleton<ITypingStatusService, TypingStatusService>();
+        // Channel to send typing status to chats
+        var sendTypingStatusChannel = Channel.CreateBounded<TypingCommand>(new BoundedChannelOptions(20)
+        {
+            FullMode = BoundedChannelFullMode.DropWrite,
+            SingleReader = false,
+            SingleWriter = false,
+            AllowSynchronousContinuations = false
+        });
+        builder.Services.AddSingleton<ChannelWriter<TypingCommand>>(resolver =>
+        {
+            var hostLifetime = resolver.GetRequiredService<IHostApplicationLifetime>();
+            hostLifetime.ApplicationStopping.Register(() => sendTypingStatusChannel.Writer.Complete());
+            return sendTypingStatusChannel.Writer;
+        });
+        builder.Services.AddSingleton(sendTypingStatusChannel.Reader);
         // Background services
         builder.Services.AddHostedService<LlmRequestsBackgroundService>();
         builder.Services.AddHostedService<CleanupOldMessagesBackgroundService>();
+        builder.Services.AddHostedService<TypingStatusSenderBackgroundService>();
 
         // LLM
         builder.Services.AddSingleton(new OpenAIClient(

@@ -35,21 +35,6 @@ public class DefaultGithubMcpClientFactory : IGithubMcpClientFactory
     public async Task<McpClient> CreateAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        // var httpClient = _httpClientFactory.CreateClient(GithubHttpClientName);
-        // return await McpClient.CreateAsync(
-        //     new HttpClientTransport(new HttpClientTransportOptions()
-        //         {
-        //             Endpoint = new Uri("https://api.githubcopilot.com/mcp/", UriKind.Absolute),
-        //             AdditionalHeaders = new Dictionary<string, string>()
-        //             {
-        //                 { "Authorization", "Bearer " + _options.GithubPat }
-        //             }
-        //         },
-        //         httpClient,
-        //         _loggerFactory),
-        //     null,
-        //     _loggerFactory,
-        //     cancellationToken);
         var client = await McpClient.CreateAsync(new StdioClientTransport(new()
             {
                 Command = _options.Command,
