@@ -9,10 +9,11 @@ using TgLlmBot.Commands.DisplayHelp;
 using TgLlmBot.Commands.Model;
 using TgLlmBot.Commands.Ping;
 using TgLlmBot.Commands.Repo;
+using TgLlmBot.Commands.Usage;
 using TgLlmBot.Services.DataAccess;
 using TgLlmBot.Services.Telegram.SelfInformation;
 
-namespace TgLlmBot.Services.Telegram.CommandDispatcher;
+namespace TgLlmBot.CommandDispatcher;
 
 public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
 {
@@ -31,6 +32,7 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
     private readonly PingCommandHandler _pingCommandHandler;
     private readonly RepoCommandHandler _repoCommandHandler;
     private readonly ITelegramSelfInformation _selfInformation;
+    private readonly UsageCommandHandler _usageCommandHandler;
 
     public DefaultTelegramCommandDispatcher(
         DefaultTelegramCommandDispatcherOptions options,
@@ -40,7 +42,8 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
         ChatWithLlmCommandHandler chatWithLlmCommandHandler,
         PingCommandHandler pingCommandHandler,
         RepoCommandHandler repoCommandHandler,
-        ModelCommandHandler modelCommandHandler)
+        ModelCommandHandler modelCommandHandler,
+        UsageCommandHandler usageCommandHandler)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(selfInformation);
@@ -50,6 +53,7 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
         ArgumentNullException.ThrowIfNull(pingCommandHandler);
         ArgumentNullException.ThrowIfNull(repoCommandHandler);
         ArgumentNullException.ThrowIfNull(modelCommandHandler);
+        ArgumentNullException.ThrowIfNull(usageCommandHandler);
         _options = options;
         _selfInformation = selfInformation;
         _messageStorage = messageStorage;
@@ -58,6 +62,7 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
         _pingCommandHandler = pingCommandHandler;
         _repoCommandHandler = repoCommandHandler;
         _modelCommandHandler = modelCommandHandler;
+        _usageCommandHandler = usageCommandHandler;
     }
 
     public async Task HandleMessageAsync(Message? message, UpdateType type, CancellationToken cancellationToken)
@@ -100,6 +105,12 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
                 {
                     var command = new ModelCommand(message, type);
                     await _modelCommandHandler.HandleAsync(command, cancellationToken);
+                    return;
+                }
+            case "!usage":
+                {
+                    var command = new UsageCommand(message, type);
+                    await _usageCommandHandler.HandleAsync(command, cancellationToken);
                     return;
                 }
         }

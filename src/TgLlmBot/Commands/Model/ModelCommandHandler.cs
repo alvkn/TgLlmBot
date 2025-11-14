@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Telegram.Bot;
 using Telegram.Bot.Types.Enums;
-using TgLlmBot.Services.Telegram.CommandDispatcher.Abstractions;
+using TgLlmBot.CommandDispatcher.Abstractions;
 using TgLlmBot.Services.Telegram.Markdown;
 
 namespace TgLlmBot.Commands.Model;

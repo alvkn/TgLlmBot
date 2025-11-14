@@ -1,7 +1,7 @@
 ﻿using System.Threading;
 using System.Threading.Tasks;
 
-namespace TgLlmBot.Services.Telegram.CommandDispatcher.Abstractions;
+namespace TgLlmBot.CommandDispatcher.Abstractions;
 
 public abstract class AbstractCommandHandler<TCommand> where TCommand : AbstractCommand
 {

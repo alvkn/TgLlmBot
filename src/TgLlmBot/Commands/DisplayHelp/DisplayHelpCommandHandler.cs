@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Telegram.Bot;
 using Telegram.Bot.Types.Enums;
-using TgLlmBot.Services.Telegram.CommandDispatcher.Abstractions;
+using TgLlmBot.CommandDispatcher.Abstractions;
 using TgLlmBot.Services.Telegram.Markdown;
 
 namespace TgLlmBot.Commands.DisplayHelp;
@@ -49,6 +49,7 @@ public class DisplayHelpCommandHandler : AbstractCommandHandler<DisplayHelpComma
         builder.AppendLine("`!ping` - проверка работоспособности бота");
         builder.AppendLine("`!model` - отображает текущую используемую LLM и endpoint к которому идут обращения");
         builder.AppendLine("`!repo` - ссылка на GitHub репозиторий с исходным кодом бота");
+        builder.AppendLine("`!usage` - статистика использования API ключа");
         var rawMarkdown = builder.ToString();
         var optimizedMarkdown = markdownConverter.ConvertToTelegramMarkdown(rawMarkdown);
         return optimizedMarkdown;

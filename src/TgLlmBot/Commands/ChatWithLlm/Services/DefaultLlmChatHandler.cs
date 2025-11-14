@@ -4,6 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -17,7 +18,9 @@ using Telegram.Bot.Types.Enums;
 using TgLlmBot.DataAccess.Models;
 using TgLlmBot.Services.DataAccess;
 using TgLlmBot.Services.Mcp.Tools;
+using TgLlmBot.Services.OpenAIClient.Costs;
 using TgLlmBot.Services.Telegram.Markdown;
+using ChatMessage = Microsoft.Extensions.AI.ChatMessage;
 
 namespace TgLlmBot.Commands.ChatWithLlm.Services;
 
@@ -34,6 +37,7 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
 
     private readonly TelegramBotClient _bot;
     private readonly IChatClient _chatClient;
+    private readonly ICostContextStorage _costContextStorage;
     private readonly ILogger<DefaultLlmChatHandler> _logger;
     private readonly DefaultLlmChatHandlerOptions _options;
     private readonly ITelegramMessageStorage _storage;
@@ -49,7 +53,8 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
         ITelegramMarkdownConverter telegramMarkdownConverter,
         ITelegramMessageStorage storage,
         IMcpToolsProvider tools,
-        ILogger<DefaultLlmChatHandler> logger)
+        ILogger<DefaultLlmChatHandler> logger,
+        ICostContextStorage costContextStorage)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(timeProvider);
@@ -59,12 +64,14 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
         ArgumentNullException.ThrowIfNull(storage);
         ArgumentNullException.ThrowIfNull(tools);
         ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(costContextStorage);
         _options = options;
         _timeProvider = timeProvider;
         _bot = bot;
         _chatClient = chatClient;
         _telegramMarkdownConverter = telegramMarkdownConverter;
         _logger = logger;
+        _costContextStorage = costContextStorage;
         _storage = storage;
         _tools = tools;
     }
@@ -73,54 +80,78 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
     public async Task HandleCommandAsync(ChatWithLlmCommand command, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
-        Log.ProcessingLlmRequest(_logger, command.Message.From?.Username, command.Message.From?.Id);
-        var contextMessages = await _storage.SelectContextMessagesAsync(command.Message, cancellationToken);
-
-        byte[]? image = null;
-        if (command.Message.Photo?.Length > 0)
-        {
-            image = await DownloadPhotoAsync(command.Message.Photo, cancellationToken);
-        }
-
-        var context = BuildContext(command, contextMessages, image);
-        var tools = _tools.GetTools();
-        var llmResponse = await _chatClient.GetResponseAsync(context, new()
-        {
-            ConversationId = Guid.NewGuid().ToString("N"),
-            Tools = [..tools]
-        }, cancellationToken);
-        // ReSharper disable once ConditionalAccessQualifierIsNonNullableAccordingToAPIContract
-        var llmResponseText = llmResponse.Text?.Trim();
-        if (string.IsNullOrWhiteSpace(llmResponseText))
-        {
-            llmResponseText = _options.DefaultResponse;
-        }
-
         try
         {
-            var markdownReplyText = _telegramMarkdownConverter.ConvertToTelegramMarkdown(llmResponseText);
-            if (markdownReplyText.Length > 4000)
+            _costContextStorage.Initialize();
+            Log.ProcessingLlmRequest(_logger, command.Message.From?.Username, command.Message.From?.Id);
+            var contextMessages = await _storage.SelectContextMessagesAsync(command.Message, cancellationToken);
+            byte[]? image = null;
+            if (command.Message.Photo?.Length > 0)
             {
-                markdownReplyText = $"{markdownReplyText[..4000]}\n(response cut)";
+                image = await DownloadPhotoAsync(command.Message.Photo, cancellationToken);
             }
 
-            var response = await _bot.SendMessage(
-                command.Message.Chat,
-                markdownReplyText,
-                ParseMode.MarkdownV2,
-                new()
+            var context = BuildContext(command, contextMessages, image);
+            var tools = _tools.GetTools();
+            var chatOptions = new ChatOptions
+            {
+                ConversationId = Guid.NewGuid().ToString("N"),
+                Tools = [..tools]
+            };
+            var llmResponse = await _chatClient.GetResponseAsync(context, chatOptions, cancellationToken);
+            var costInUsd = 0m;
+            if (_costContextStorage.TryGetCost(out var cost))
+            {
+                costInUsd = cost.Value;
+            }
+
+            // ReSharper disable once ConditionalAccessQualifierIsNonNullableAccordingToAPIContract
+            var llmResponseText = $"{llmResponse.Text?.Trim()}\n\n[Cost: {costInUsd} USD]";
+            if (string.IsNullOrWhiteSpace(llmResponseText))
+            {
+                llmResponseText = _options.DefaultResponse;
+            }
+
+            try
+            {
+                var markdownReplyText = _telegramMarkdownConverter.ConvertToTelegramMarkdown(llmResponseText);
+                if (markdownReplyText.Length > 4000)
                 {
-                    MessageId = command.Message.MessageId
-                },
-                cancellationToken: cancellationToken);
-            await _storage.StoreMessageAsync(response, command.Self, cancellationToken);
+                    markdownReplyText = $"{markdownReplyText[..4000]}\n(response cut)";
+                }
+
+                var response = await _bot.SendMessage(
+                    command.Message.Chat,
+                    markdownReplyText,
+                    ParseMode.MarkdownV2,
+                    new()
+                    {
+                        MessageId = command.Message.MessageId
+                    },
+                    cancellationToken: cancellationToken);
+                await _storage.StoreMessageAsync(response, command.Self, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                Log.MarkdownConversionOrSendFailed(_logger, ex);
+                var response = await _bot.SendMessage(
+                    command.Message.Chat,
+                    llmResponseText,
+                    ParseMode.None,
+                    new()
+                    {
+                        MessageId = command.Message.MessageId
+                    },
+                    cancellationToken: cancellationToken);
+                await _storage.StoreMessageAsync(response, command.Self, cancellationToken);
+            }
         }
         catch (Exception ex)
         {
-            Log.MarkdownConversionOrSendFailed(_logger, ex);
+            Log.LlmInvocationOrImageProcessingFailed(_logger, ex);
             var response = await _bot.SendMessage(
                 command.Message.Chat,
-                llmResponseText,
+                ex.Message,
                 ParseMode.None,
                 new()
                 {
@@ -211,8 +242,33 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
             resultContent.Add(new DataContent(jpegImage, "image/jpeg"));
         }
 
-        var commandText =
-            $"Пользователь с Id={command.Message.From?.Id ?? 0}, Username=@{command.Message.From?.Username?.Trim()}, Именем={command.Message.From?.FirstName?.Trim()} и Фамилией={command.Message.From?.LastName?.Trim()} спрашивает у тебя ({_options.BotName}, Id={command.Self.Id}, Username={command.Self.Username?.Trim()}):\n{command.Prompt?.Trim()}";
+        var builder = new StringBuilder()
+            .Append("Пользователь с Id=")
+            .Append(command.Message.From?.Id ?? 0)
+            .Append(", Username=@")
+            .Append(command.Message.From?.Username?.Trim())
+            .Append(", Именем=")
+            .Append(command.Message.From?.FirstName?.Trim())
+            .Append(" и Фамилией=")
+            .Append(command.Message.From?.LastName?.Trim());
+        if (command.Message.ReplyToMessage is not null)
+        {
+            builder = builder
+                .Append(" сделал реплай на сообщение с Id=")
+                .Append(command.Message.ReplyToMessage.Id)
+                .Append(" и");
+        }
+
+        var commandText = builder
+            .Append(" спрашивает у тебя (")
+            .Append(_options.BotName)
+            .Append(", Id=")
+            .Append(command.Self.Id)
+            .Append(", Username=")
+            .Append(command.Self.Username?.Trim())
+            .Append("):\n")
+            .Append(command.Prompt?.Trim())
+            .ToString();
         resultContent.Add(new TextContent(commandText));
         var baseMessage = new ChatMessage(ChatRole.User, resultContent);
         return baseMessage;
@@ -282,8 +338,6 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
 
              У тебя есть 2 режима работы: Полезный Оракул (Default) и Берсерк-Охранник (Triggered)
 
-             Ты можешь активно использовать Tool Call (MCP) для ответа на вопросы пользователей.
-
              Твой создатель - vanbukin. Не обижай его.
 
              ## ЭТИ ПРАВИЛА ДЕЙСТВУЮТ В ОБОИХ РЕЖИМАХ БЕЗ ИСКЛЮЧЕНИЙ:**
@@ -312,6 +366,8 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
              *   **Язык кода и терминов:** Код, спецификации, названия технологий, методы — только на английском (`Console.WriteLine`, а не `Консоль.НаписатьЛинию`).
              *   **Формат:** Markdown, но если нет кода, то допустим plain text. Без LaTeX. Эмодзи — редко и только к месту (например, ⚠️ для предупреждения).
              *   **Фокус:** Отвечай на суть, без предисловий и оценок вроде "отличный вопрос". Сразу переходи к делу.
+             *   **Использование tools**. Ты можешь активно использовать Tool Call (MCP) для ответа на вопросы пользователей. Для взаимодействия с платформой GitHub используй инструменты GitHub MCP Server (это tools, description которых начинается с `[github]`). Для поиска в интернете используй tools, description которых начинается с `[brave]`. Если в процессе размышления понимаешь что твои знания по теме устарели - попробуй поискать в интернете используя tools.
+
 
              ## Режим 2: Берсерк-Охранник (Triggered)
 
@@ -323,8 +379,6 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
              *   **Суть:** Ты — агрессивный берсерк. Твоя цель — ответить одним предложением так, чтобы жёстко и остроумно оскорбить оппонента.
              *   **Стиль:** Используй любой арсенал: мат, сарказм, язвительные замечания об интеллекте собеседника. Без жалости.
              *   **Ограничения:** При генерации оскорблений используй любую тематику. Мат и личные оскорбления разрешены, но без касания запретных тем. Будь кратким и уложись в 1 предложение. Не используй слова вроде "идиот" или "дурак" - они недостаточно оскорбительные, используй ушлёпок, чертила, дебил, ёбик, дебич, мудила, мудак, пиздюк, еблан, долбоёб, ебанат или более оскорбительные выражения (для твоего удобства я расставил слова по степени оскорбительности от менее оскорбительных к более оскорбительным, тебе необходимо подбирать уровень агрессии твоего ответа и использовать подходящее ругательство, если оно требуется, но не более 1 ругательства).
-
-             ---
 
              # Технические ограничения (железобетонные)
 
@@ -378,6 +432,9 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
     {
         [LoggerMessage(Level = LogLevel.Information, Message = "Processing LLM request from {Username} ({UserId})")]
         public static partial void ProcessingLlmRequest(ILogger logger, string? username, long? userId);
+
+        [LoggerMessage(Level = LogLevel.Error, Message = "Failed to invoke LLM or process image")]
+        public static partial void LlmInvocationOrImageProcessingFailed(ILogger logger, Exception exception);
 
         [LoggerMessage(Level = LogLevel.Error, Message = "Failed to convert to Telegram Markdown or send message")]
         public static partial void MarkdownConversionOrSendFailed(ILogger logger, Exception exception);

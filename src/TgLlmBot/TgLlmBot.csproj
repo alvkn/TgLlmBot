@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <UserSecretsId>TgLlmBot-99b1ff5f-a826-4365-bba6-477db696a75c</UserSecretsId>
-    <NoWarn>$(NoWarn);CA1515;</NoWarn>
+    <NoWarn>$(NoWarn);CA1515;CA1812;</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,9 +22,5 @@
     <PackageReference Include="Npgsql" Version="9.0.4" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
     <PackageReference Include="Telegram.Bot" Version="22.7.5" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Services\Mcp\Clients\" />
   </ItemGroup>
 </Project>

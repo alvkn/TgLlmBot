@@ -6,4 +6,7 @@ public class McpOptions
 {
     [Required]
     public McpGithubOptions Github { get; set; } = default!;
+
+    [Required]
+    public McpBraveOptions Brave { get; set; } = default!;
 }
