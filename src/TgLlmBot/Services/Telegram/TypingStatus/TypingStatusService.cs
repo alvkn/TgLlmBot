@@ -18,13 +18,13 @@ public class TypingStatusService : ITypingStatusService
         _stopTypingCommandWriter = stopTypingCommandWriter;
     }
 
-    public void StartTyping(long chatId, int? threadId)
+    public void StartTyping(long chatId)
     {
-        _startTypingCommandWriter.TryWrite(new(chatId, threadId));
+        _startTypingCommandWriter.TryWrite(new(chatId));
     }
 
-    public void StopTyping(long chatId, int? threadId)
+    public void StopTyping(long chatId)
     {
-        _stopTypingCommandWriter.TryWrite(new(chatId, threadId));
+        _stopTypingCommandWriter.TryWrite(new(chatId));
     }
 }

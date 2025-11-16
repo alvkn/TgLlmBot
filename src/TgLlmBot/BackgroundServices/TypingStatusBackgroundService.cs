@@ -21,7 +21,7 @@ public partial class TypingStatusBackgroundService : BackgroundService
     private readonly TelegramBotClient _bot;
     private readonly ILogger<TypingStatusBackgroundService> _logger;
 
-    private readonly ConcurrentDictionary<ChatThread, CancellationTokenSource> _activeTypingTimersCts = new();
+    private readonly ConcurrentDictionary<long, CancellationTokenSource> _activeTypingTimersCts = new();
 
     public TypingStatusBackgroundService(
         ChannelReader<StartTypingCommand> startTypingChannelReader,
@@ -55,17 +55,15 @@ public partial class TypingStatusBackgroundService : BackgroundService
     {
         await foreach (var cmd in _startTypingChannelReader.ReadAllAsync(stoppingToken))
         {
-            var key = new ChatThread(cmd.ChatId, cmd.ThreadId);
-
-            if (_activeTypingTimersCts.ContainsKey(key))
+            if (_activeTypingTimersCts.ContainsKey(cmd.ChatId))
             {
                 continue;
             }
 
             var cts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
-            if (_activeTypingTimersCts.TryAdd(key, cts))
+            if (_activeTypingTimersCts.TryAdd(cmd.ChatId, cts))
             {
-                _ = RunTypingAsync(key, cts.Token);
+                _ = RunTypingAsync(cmd.ChatId, cts.Token);
             }
         }
     }
@@ -74,52 +72,52 @@ public partial class TypingStatusBackgroundService : BackgroundService
     {
         await foreach (var cmd in _stopTypingChannelReader.ReadAllAsync(stoppingToken))
         {
-            var key = new ChatThread(cmd.ChatId, cmd.ThreadId);
-
-            if (_activeTypingTimersCts.TryRemove(key, out var cts))
+            if (_activeTypingTimersCts.TryRemove(cmd.ChatId, out var cts))
             {
                 await cts.CancelAsync();
                 cts.Dispose();
-                LogRemovedTypingState(cmd.ChatId, cmd.ThreadId);
+                LogRemovedTypingState(cmd.ChatId);
             }
         }
     }
 
     [SuppressMessage("Design", "CA1031:Do not catch general exception types")]
-    private async Task RunTypingAsync(ChatThread info, CancellationToken ct)
+    private async Task RunTypingAsync(long chatId, CancellationToken ct)
     {
-        LogTypingActionStarted(info.ChatId, info.ThreadId);
+        LogTypingActionStarted(chatId);
 
         try
         {
             using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(TypingIntervalMs));
-            await SendTypingRequest(info, ct);
+
+            // отправляем тайпинг статус сразу
+            await SendTypingRequest(chatId, ct);
+
             while (await timer.WaitForNextTickAsync(ct))
             {
-                await SendTypingRequest(info, ct);
+                // каждые 4 секунды продлеваем тайпинг статус
+                await SendTypingRequest(chatId, ct);
             }
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
-            LogFailedToSendChatActionToChat(info.ChatId, info.ThreadId, ex);
+            LogFailedToSendChatActionToChat(chatId, ex);
         }
         finally
         {
-            if (_activeTypingTimersCts.TryRemove(info, out var cts))
+            if (_activeTypingTimersCts.TryRemove(chatId, out var cts))
             {
                 cts.Dispose();
             }
         }
     }
 
-    private async Task SendTypingRequest(ChatThread info, CancellationToken ct)
+    private async Task SendTypingRequest(long chatId, CancellationToken ct)
     {
-        await _bot.SendChatAction(info.ChatId, ChatAction.Typing, info.ThreadId, cancellationToken: ct);
-        LogTypingActionSent(info.ChatId, info.ThreadId);
+        await _bot.SendChatAction(chatId, ChatAction.Typing, cancellationToken: ct);
+        LogTypingActionSent(chatId);
     }
-
-    private record struct ChatThread(long ChatId, int? ThreadId);
 
     [LoggerMessage(LogLevel.Information, "Typing Service Started")]
     partial void LogTypingStatusWorkerStarted();
@@ -127,15 +125,15 @@ public partial class TypingStatusBackgroundService : BackgroundService
     [LoggerMessage(LogLevel.Information, "Typing Service Stopped")]
     partial void LogTypingStatusWorkerStopped();
 
-    [LoggerMessage(LogLevel.Debug, "Started typing loop for chat {chatId} thread {threadId}")]
-    partial void LogTypingActionStarted(long chatId, int? threadId);
+    [LoggerMessage(LogLevel.Debug, "Started typing loop for chat {chatId}")]
+    partial void LogTypingActionStarted(long chatId);
 
-    [LoggerMessage(LogLevel.Debug, "Stopped typing loop for chat {chatId} thread {threadId}")]
-    partial void LogRemovedTypingState(long chatId, int? threadId);
+    [LoggerMessage(LogLevel.Debug, "Stopped typing loop for chat {chatId}")]
+    partial void LogRemovedTypingState(long chatId);
 
-    [LoggerMessage(LogLevel.Trace, "Sent typing action to {chatId} thread {threadId}")]
-    partial void LogTypingActionSent(long chatId, int? threadId);
+    [LoggerMessage(LogLevel.Trace, "Sent typing action to {chatId}")]
+    partial void LogTypingActionSent(long chatId);
 
-    [LoggerMessage(LogLevel.Error, "Error sending typing action to {chatId} thread {threadId}")]
-    partial void LogFailedToSendChatActionToChat(long chatId, int? threadId, Exception ex);
+    [LoggerMessage(LogLevel.Error, "Error sending typing action to {chatId}")]
+    partial void LogFailedToSendChatActionToChat(long chatId, Exception ex);
 }

@@ -90,7 +90,7 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
             _costContextStorage.Initialize();
             Log.ProcessingLlmRequest(_logger, command.Message.From?.Username, command.Message.From?.Id);
 
-            _typingStatusService.StartTyping(command.Message.Chat.Id, command.Message.MessageThreadId);
+            _typingStatusService.StartTyping(command.Message.Chat.Id);
 
             var contextMessages = await _storage.SelectContextMessagesAsync(command.Message, cancellationToken);
             byte[]? image = null;
@@ -128,7 +128,7 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
                     markdownReplyText = $"{markdownReplyText[..4000]}\n(response cut)";
                 }
 
-                _typingStatusService.StopTyping(command.Message.Chat.Id, command.Message.MessageThreadId);
+                _typingStatusService.StopTyping(command.Message.Chat.Id);
                 var response = await _bot.SendMessage(
                     command.Message.Chat,
                     markdownReplyText,
@@ -143,7 +143,7 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
             catch (Exception ex)
             {
                 Log.MarkdownConversionOrSendFailed(_logger, ex);
-                _typingStatusService.StopTyping(command.Message.Chat.Id, command.Message.MessageThreadId);
+                _typingStatusService.StopTyping(command.Message.Chat.Id);
                 var response = await _bot.SendMessage(
                     command.Message.Chat,
                     llmResponseText,
@@ -170,29 +170,6 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
                 },
                 cancellationToken: cancellationToken);
             await _storage.StoreMessageAsync(response, command.Self, cancellationToken);
-        }
-    }
-
-    [SuppressMessage("Design", "CA1031:Do not catch general exception types")]
-    private async Task SendTypingStatusPeriodicallyAsync(
-        ChatId chatId,
-        Task completionTask,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            while (!completionTask.IsCompleted)
-            {
-                await _bot.SendChatAction(chatId, ChatAction.Typing, cancellationToken: cancellationToken);
-
-                var delayTask = Task.Delay(TimeSpan.FromSeconds(4), cancellationToken);
-                await Task.WhenAny(completionTask, delayTask);
-            }
-        }
-        catch (OperationCanceledException) { }
-        catch (Exception ex)
-        {
-            Log.SendTypingStatusFailed(_logger, ex);
         }
     }
 
