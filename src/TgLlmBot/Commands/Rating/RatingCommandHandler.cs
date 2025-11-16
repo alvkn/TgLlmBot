@@ -303,7 +303,7 @@ public partial class RatingCommandHandler : AbstractCommandHandler<RatingCommand
 
             var percentage = user.MessageCount * 100.0 / totalMessages;
             builder.AppendLine(CultureInfo.InvariantCulture, $"{medal} #{rank}: `{name}`");
-            builder.AppendLine(CultureInfo.InvariantCulture, $"   Качество щитпоста: {user.CombinedScore:F1}/100");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"   Уровень кринжа: {user.CombinedScore:F1}/100");
             builder.AppendLine(CultureInfo.InvariantCulture, $"   Сообщений: {user.MessageCount} ({percentage:F1}%)");
             builder.AppendLine(CultureInfo.InvariantCulture, $"   Паттерны: {user.PatternScore:F0} | LLM: {user.LlmScore:F0}");
             builder.AppendLine();
