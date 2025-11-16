@@ -8,11 +8,12 @@ using TgLlmBot.Commands.ChatWithLlm;
 using TgLlmBot.Commands.DisplayHelp;
 using TgLlmBot.Commands.Model;
 using TgLlmBot.Commands.Ping;
+using TgLlmBot.Commands.Rating;
 using TgLlmBot.Commands.Repo;
-using TgLlmBot.Commands.Shitposter;
 using TgLlmBot.Commands.Usage;
 using TgLlmBot.Services.DataAccess;
 using TgLlmBot.Services.Telegram.SelfInformation;
+using RatingCommandHandler = TgLlmBot.Commands.Rating.RatingCommandHandler;
 
 namespace TgLlmBot.CommandDispatcher;
 
@@ -31,9 +32,9 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
 
     private readonly DefaultTelegramCommandDispatcherOptions _options;
     private readonly PingCommandHandler _pingCommandHandler;
+    private readonly RatingCommandHandler _ratingCommandHandler;
     private readonly RepoCommandHandler _repoCommandHandler;
     private readonly ITelegramSelfInformation _selfInformation;
-    private readonly ShitposterCommandHandler _shitposterCommandHandler;
     private readonly UsageCommandHandler _usageCommandHandler;
 
     public DefaultTelegramCommandDispatcher(
@@ -46,7 +47,7 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
         RepoCommandHandler repoCommandHandler,
         ModelCommandHandler modelCommandHandler,
         UsageCommandHandler usageCommandHandler,
-        ShitposterCommandHandler shitposterCommandHandler)
+        RatingCommandHandler ratingCommandHandler)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(selfInformation);
@@ -57,7 +58,7 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
         ArgumentNullException.ThrowIfNull(repoCommandHandler);
         ArgumentNullException.ThrowIfNull(modelCommandHandler);
         ArgumentNullException.ThrowIfNull(usageCommandHandler);
-        ArgumentNullException.ThrowIfNull(shitposterCommandHandler);
+        ArgumentNullException.ThrowIfNull(ratingCommandHandler);
         _options = options;
         _selfInformation = selfInformation;
         _messageStorage = messageStorage;
@@ -67,7 +68,7 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
         _repoCommandHandler = repoCommandHandler;
         _modelCommandHandler = modelCommandHandler;
         _usageCommandHandler = usageCommandHandler;
-        _shitposterCommandHandler = shitposterCommandHandler;
+        _ratingCommandHandler = ratingCommandHandler;
     }
 
     public async Task HandleMessageAsync(Message? message, UpdateType type, CancellationToken cancellationToken)
@@ -118,10 +119,10 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
                     await _usageCommandHandler.HandleAsync(command, cancellationToken);
                     return;
                 }
-            case "!shitposter":
+            case "!rating":
                 {
-                    var command = new ShitposterCommand(message, type);
-                    await _shitposterCommandHandler.HandleAsync(command, cancellationToken);
+                    var command = new RatingCommand(message, type);
+                    await _ratingCommandHandler.HandleAsync(command, cancellationToken);
                     return;
                 }
         }

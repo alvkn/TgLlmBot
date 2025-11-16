@@ -27,7 +27,6 @@ using TgLlmBot.Commands.DisplayHelp;
 using TgLlmBot.Commands.Model;
 using TgLlmBot.Commands.Ping;
 using TgLlmBot.Commands.Repo;
-using TgLlmBot.Commands.Shitposter;
 using TgLlmBot.Commands.Usage;
 using TgLlmBot.Configuration.Options;
 using TgLlmBot.Configuration.TypedConfiguration;
@@ -45,6 +44,7 @@ using TgLlmBot.Services.OpenRouter;
 using TgLlmBot.Services.Telegram.Markdown;
 using TgLlmBot.Services.Telegram.RequestHandler;
 using TgLlmBot.Services.Telegram.SelfInformation;
+using RatingCommandHandler = TgLlmBot.Commands.Rating.RatingCommandHandler;
 
 namespace TgLlmBot;
 
@@ -169,7 +169,7 @@ public partial class Program
         builder.Services.AddSingleton<PingCommandHandler>();
         builder.Services.AddSingleton<RepoCommandHandler>();
         builder.Services.AddSingleton<UsageCommandHandler>();
-        builder.Services.AddSingleton<ShitposterCommandHandler>();
+        builder.Services.AddSingleton<RatingCommandHandler>();
         // Channel to communicate with LLM
         var llmRequestChannel = Channel.CreateBounded<ChatWithLlmCommand>(new BoundedChannelOptions(20)
         {

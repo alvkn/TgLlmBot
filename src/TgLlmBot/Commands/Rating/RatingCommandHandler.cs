@@ -15,16 +15,16 @@ using TgLlmBot.DataAccess.Models;
 using TgLlmBot.Services.DataAccess;
 using TgLlmBot.Services.Telegram.Markdown;
 
-namespace TgLlmBot.Commands.Shitposter;
+namespace TgLlmBot.Commands.Rating;
 
-public partial class ShitposterCommandHandler : AbstractCommandHandler<ShitposterCommand>
+public partial class RatingCommandHandler : AbstractCommandHandler<RatingCommand>
 {
     private readonly TelegramBotClient _bot;
     private readonly IChatClient _chatClient;
     private readonly ITelegramMarkdownConverter _markdownConverter;
     private readonly ITelegramMessageStorage _storage;
 
-    public ShitposterCommandHandler(
+    public RatingCommandHandler(
         TelegramBotClient bot,
         ITelegramMessageStorage storage,
         ITelegramMarkdownConverter markdownConverter,
@@ -43,7 +43,7 @@ public partial class ShitposterCommandHandler : AbstractCommandHandler<Shitposte
     [GeneratedRegex(@"\p{So}|\p{Sk}")]
     private static partial Regex EmojiRegex();
 
-    public override async Task HandleAsync(ShitposterCommand command, CancellationToken cancellationToken)
+    public override async Task HandleAsync(RatingCommand command, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(command);
@@ -55,14 +55,11 @@ public partial class ShitposterCommandHandler : AbstractCommandHandler<Shitposte
 
         // Group messages by user
         var userMessages = contextMessages
-            .Where(m => !m.IsLlmReplyToMessage) // Exclude bot messages
             .Where(m => m.FromUserId.HasValue) // Only users with IDs
+            .Where(m => !m.IsLlmReplyToMessage) // Exclude bot messages
             .GroupBy(m => new
             {
-                m.FromUserId,
-                m.FromUsername,
-                m.FromFirstName,
-                m.FromLastName
+                m.FromUserId
             })
             .ToList();
 
@@ -84,23 +81,26 @@ public partial class ShitposterCommandHandler : AbstractCommandHandler<Shitposte
                 sampleMessages.Add(messages[i * step]);
             }
 
-            var llmScore = await AnalyzeMessagesWithLlm(sampleMessages, cancellationToken);
+            var llmScore = await AnalyzeMessagesWithLlmAsync(sampleMessages, cancellationToken);
 
             // Combined score: 60% pattern-based, 40% LLM-based
             var combinedScore = (patternScore * 0.6) + (llmScore * 0.4);
 
-            userStatsWithScores.Add(new()
-            {
-                UserId = userGroup.Key.FromUserId!.Value,
-                Username = userGroup.Key.FromUsername,
-                FirstName = userGroup.Key.FromFirstName,
-                LastName = userGroup.Key.FromLastName,
-                MessageCount = messages.Count,
-                AvgLength = messages.Average(m => (m.Text?.Length ?? 0) + (m.Caption?.Length ?? 0)),
-                PatternScore = patternScore,
-                LlmScore = llmScore,
-                CombinedScore = combinedScore
-            });
+            var lastMessage = userGroup.Last();
+            var username = lastMessage.FromUsername;
+            var firstName = lastMessage.FromFirstName;
+            var lastName = lastMessage.FromLastName;
+
+            userStatsWithScores.Add(new(
+                userGroup.Key.FromUserId!.Value,
+                username,
+                firstName,
+                lastName,
+                messages.Count,
+                messages.Average(m => (m.Text?.Length ?? 0) + (m.Caption?.Length ?? 0)),
+                patternScore,
+                llmScore,
+                combinedScore));
         }
 
         // Sort by combined score
@@ -204,7 +204,7 @@ public partial class ShitposterCommandHandler : AbstractCommandHandler<Shitposte
     }
 
     [SuppressMessage("Design", "CA1031:Do not catch general exception types")]
-    private async Task<double> AnalyzeMessagesWithLlm(List<DbChatMessage> messages, CancellationToken cancellationToken)
+    private async Task<double> AnalyzeMessagesWithLlmAsync(List<DbChatMessage> messages, CancellationToken cancellationToken)
     {
         if (messages.Count == 0)
         {
@@ -275,7 +275,7 @@ public partial class ShitposterCommandHandler : AbstractCommandHandler<Shitposte
         }
 
         var builder = new StringBuilder();
-        builder.AppendLine("🎭 **Рейтинг Шитпостеров**");
+        builder.AppendLine("🎭 **Рейтинг Щитпостеров**");
         builder.AppendLine("_Semantic analysis enabled_");
         builder.AppendLine();
 
@@ -292,11 +292,18 @@ public partial class ShitposterCommandHandler : AbstractCommandHandler<Shitposte
                 _ => "  "
             };
 
-            var name = user.Username ?? user.FirstName ?? "Anonymous";
-            var percentage = user.MessageCount * 100.0 / totalMessages;
+            var name = user.Username;
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                var combinedName = $"{user.FirstName?.Trim()} {user.LastName?.Trim()}".Trim();
+                name = !string.IsNullOrWhiteSpace(combinedName)
+                    ? combinedName
+                    : "Anonymous";
+            }
 
+            var percentage = user.MessageCount * 100.0 / totalMessages;
             builder.AppendLine(CultureInfo.InvariantCulture, $"{medal} #{rank}: `{name}`");
-            builder.AppendLine(CultureInfo.InvariantCulture, $"   Качество шитпоста: {user.CombinedScore:F1}/100");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"   Качество щитпоста: {user.CombinedScore:F1}/100");
             builder.AppendLine(CultureInfo.InvariantCulture, $"   Сообщений: {user.MessageCount} ({percentage:F1}%)");
             builder.AppendLine(CultureInfo.InvariantCulture, $"   Паттерны: {user.PatternScore:F0} | LLM: {user.LlmScore:F0}");
             builder.AppendLine();
@@ -309,14 +316,36 @@ public partial class ShitposterCommandHandler : AbstractCommandHandler<Shitposte
 
     private sealed class UserShitpostStats
     {
-        public long UserId { get; init; }
-        public string? Username { get; init; }
-        public string? FirstName { get; init; }
-        public string? LastName { get; init; }
-        public int MessageCount { get; init; }
-        public double AvgLength { get; init; }
-        public double PatternScore { get; init; }
-        public double LlmScore { get; init; }
-        public double CombinedScore { get; init; }
+        public UserShitpostStats(
+            long userId,
+            string? username,
+            string? firstName,
+            string? lastName,
+            int messageCount,
+            double avgLength,
+            double patternScore,
+            double llmScore,
+            double combinedScore)
+        {
+            UserId = userId;
+            Username = username;
+            FirstName = firstName;
+            LastName = lastName;
+            MessageCount = messageCount;
+            AvgLength = avgLength;
+            PatternScore = patternScore;
+            LlmScore = llmScore;
+            CombinedScore = combinedScore;
+        }
+
+        public long UserId { get; }
+        public string? Username { get; }
+        public string? FirstName { get; }
+        public string? LastName { get; }
+        public int MessageCount { get; }
+        public double AvgLength { get; }
+        public double PatternScore { get; }
+        public double LlmScore { get; }
+        public double CombinedScore { get; }
     }
 }
