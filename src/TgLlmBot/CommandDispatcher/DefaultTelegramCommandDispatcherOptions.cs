@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace TgLlmBot.Services.Telegram.CommandDispatcher;
+namespace TgLlmBot.CommandDispatcher;
 
 public class DefaultTelegramCommandDispatcherOptions
 {

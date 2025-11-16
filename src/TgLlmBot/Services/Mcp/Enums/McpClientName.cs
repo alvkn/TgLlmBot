@@ -2,5 +2,6 @@
 
 public enum McpClientName
 {
-    Github
+    Github,
+    Brave
 }

@@ -1,7 +1,7 @@
 ﻿using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 
-namespace TgLlmBot.Services.Telegram.CommandDispatcher.Abstractions;
+namespace TgLlmBot.CommandDispatcher.Abstractions;
 
 public abstract class AbstractCommand
 {

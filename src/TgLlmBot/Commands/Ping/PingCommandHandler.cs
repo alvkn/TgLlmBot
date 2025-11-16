@@ -2,7 +2,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Telegram.Bot;
-using TgLlmBot.Services.Telegram.CommandDispatcher.Abstractions;
+using TgLlmBot.CommandDispatcher.Abstractions;
 
 namespace TgLlmBot.Commands.Ping;
 

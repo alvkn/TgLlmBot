@@ -1,6 +1,9 @@
 using System;
 using System.ClientModel;
+using System.ClientModel.Primitives;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -16,6 +19,7 @@ using OpenAI;
 using OpenAI.Chat;
 using Telegram.Bot;
 using TgLlmBot.BackgroundServices;
+using TgLlmBot.CommandDispatcher;
 using TgLlmBot.Commands.ChatWithLlm;
 using TgLlmBot.Commands.ChatWithLlm.BackgroundServices.LlmRequests;
 using TgLlmBot.Commands.ChatWithLlm.Services;
@@ -23,16 +27,20 @@ using TgLlmBot.Commands.DisplayHelp;
 using TgLlmBot.Commands.Model;
 using TgLlmBot.Commands.Ping;
 using TgLlmBot.Commands.Repo;
+using TgLlmBot.Commands.Usage;
 using TgLlmBot.Configuration.Options;
 using TgLlmBot.Configuration.TypedConfiguration;
 using TgLlmBot.DataAccess;
 using TgLlmBot.DataAccess.Design;
 using TgLlmBot.Extensions.Configuration;
 using TgLlmBot.Services.DataAccess;
+using TgLlmBot.Services.Mcp.Clients.Brave;
 using TgLlmBot.Services.Mcp.Clients.Github;
 using TgLlmBot.Services.Mcp.Enums;
 using TgLlmBot.Services.Mcp.Tools;
-using TgLlmBot.Services.Telegram.CommandDispatcher;
+using TgLlmBot.Services.OpenAIClient.Costs;
+using TgLlmBot.Services.OpenAIClient.HttpClient.DelegatingHandlers;
+using TgLlmBot.Services.OpenRouter;
 using TgLlmBot.Services.Telegram.Markdown;
 using TgLlmBot.Services.Telegram.RequestHandler;
 using TgLlmBot.Services.Telegram.SelfInformation;
@@ -42,6 +50,8 @@ namespace TgLlmBot;
 [SuppressMessage("Design", "CA1052:Static holder types should be Static or NotInheritable")]
 public partial class Program
 {
+    private const string LlmHttpClient = "llm-http-client";
+
     [SuppressMessage("ReSharper", "ConvertToUsingDeclaration")]
     [SuppressMessage("Design", "CA1031:Do not catch general exception types")]
     public static async Task<int> Main(string[] args)
@@ -99,9 +109,15 @@ public partial class Program
         await using (var asyncScope = scopeFactory.CreateAsyncScope())
         {
             var toolsProvider = asyncScope.ServiceProvider.GetRequiredService<DefaultMcpToolsProvider>();
+
             var github = asyncScope.ServiceProvider.GetRequiredKeyedService<McpClient>(McpClientName.Github);
+            var brave = asyncScope.ServiceProvider.GetRequiredKeyedService<McpClient>(McpClientName.Brave);
+
             var githubTools = await github.ListToolsAsync();
-            toolsProvider.AddTools(githubTools);
+            var braveTools = await brave.ListToolsAsync();
+
+            toolsProvider.AddTools(githubTools.Select(x => x.WithDescription($"[github] {x.Description?.Trim()}")));
+            toolsProvider.AddTools(braveTools.Select(x => x.WithDescription($"[brave] {x.Description?.Trim()}")));
         }
     }
 
@@ -150,6 +166,7 @@ public partial class Program
         builder.Services.AddSingleton<ModelCommandHandler>();
         builder.Services.AddSingleton<PingCommandHandler>();
         builder.Services.AddSingleton<RepoCommandHandler>();
+        builder.Services.AddSingleton<UsageCommandHandler>();
         // Channel to communicate with LLM
         var llmRequestChannel = Channel.CreateBounded<ChatWithLlmCommand>(new BoundedChannelOptions(20)
         {
@@ -170,12 +187,23 @@ public partial class Program
         builder.Services.AddHostedService<CleanupOldMessagesBackgroundService>();
 
         // LLM
-        builder.Services.AddSingleton(new OpenAIClient(
-            new ApiKeyCredential(config.Llm.ApiKey),
-            new()
-            {
-                Endpoint = config.Llm.Endpoint
-            }));
+        builder.Services.AddSingleton<ICostContextStorage, DefaultCostContextStorage>();
+        builder.Services.AddTransient<ModifyChatCompletionsRequestDelegatingHandler>();
+        builder.Services.AddHttpClient(LlmHttpClient)
+            .AddHttpMessageHandler<ModifyChatCompletionsRequestDelegatingHandler>();
+        builder.Services.AddSingleton(resolver =>
+        {
+            var httpClientFactory = resolver.GetRequiredService<IHttpClientFactory>();
+            var loggerFactory = resolver.GetRequiredService<ILoggerFactory>();
+            var httpClient = httpClientFactory.CreateClient(LlmHttpClient);
+            return new OpenAIClient(
+                new ApiKeyCredential(config.Llm.ApiKey),
+                new()
+                {
+                    Endpoint = config.Llm.Endpoint,
+                    Transport = new HttpClientPipelineTransport(httpClient, true, loggerFactory)
+                });
+        });
         builder.Services.AddSingleton(resolver =>
         {
             var openAiClient = resolver.GetRequiredService<OpenAIClient>();
@@ -209,6 +237,7 @@ public partial class Program
         // MCP
         builder.Services.AddSingleton<DefaultMcpToolsProvider>();
         builder.Services.AddSingleton<IMcpToolsProvider>(resolver => resolver.GetRequiredService<DefaultMcpToolsProvider>());
+        // MCP - Github
         builder.Services.AddHttpClient(DefaultGithubMcpClientFactory.GithubHttpClientName);
         builder.Services.AddSingleton(new DefaultGithubMcpClientFactoryOptions(
             config.Mcp.Github.PersonalAccessToken,
@@ -221,7 +250,18 @@ public partial class Program
                 var githubFactory = resolver.GetRequiredService<IGithubMcpClientFactory>();
                 return githubFactory.CreateAsync(CancellationToken.None).GetAwaiter().GetResult();
             });
-
+        // MCP - Brave
+        builder.Services.AddSingleton(new DefaultBraveMcpClientFactoryOptions(config.Mcp.Brave.ApiKey));
+        builder.Services.AddSingleton<IBraveMcpClientFactory, DefaultBraveMcpClientFactory>();
+        builder.Services.AddKeyedSingleton<McpClient>(McpClientName.Brave,
+            (resolver, _) =>
+            {
+                var githubFactory = resolver.GetRequiredService<IBraveMcpClientFactory>();
+                return githubFactory.CreateAsync(CancellationToken.None).GetAwaiter().GetResult();
+            });
+        // OpenRouter stats
+        builder.Services.AddSingleton(new DefaultOpenRouterKeyUsageProviderOptions(config.Llm.ApiKey));
+        builder.Services.AddHttpClient<IOpenRouterKeyUsageProvider, DefaultOpenRouterKeyUsageProvider>();
         return builder;
     }
 
