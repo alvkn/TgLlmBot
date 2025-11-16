@@ -80,12 +80,17 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
     public async Task HandleCommandAsync(ChatWithLlmCommand command, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
+        var typingCompletionSource = new TaskCompletionSource();
+
         try
         {
             _costContextStorage.Initialize();
             Log.ProcessingLlmRequest(_logger, command.Message.From?.Username, command.Message.From?.Id);
 
-            await _bot.SendChatAction(command.Message.Chat, ChatAction.Typing, cancellationToken: cancellationToken);
+            var typingTask = SendTypingStatusPeriodicallyAsync(
+                command.Message.Chat,
+                typingCompletionSource.Task,
+                cancellationToken);
 
             var contextMessages = await _storage.SelectContextMessagesAsync(command.Message, cancellationToken);
             byte[]? image = null;
@@ -123,6 +128,9 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
                     markdownReplyText = $"{markdownReplyText[..4000]}\n(response cut)";
                 }
 
+                typingCompletionSource.TrySetResult();
+                await typingTask;
+
                 var response = await _bot.SendMessage(
                     command.Message.Chat,
                     markdownReplyText,
@@ -152,6 +160,8 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
         catch (Exception ex)
         {
             Log.LlmInvocationOrImageProcessingFailed(_logger, ex);
+            typingCompletionSource.TrySetResult();
+
             var response = await _bot.SendMessage(
                 command.Message.Chat,
                 ex.Message,
@@ -162,6 +172,29 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
                 },
                 cancellationToken: cancellationToken);
             await _storage.StoreMessageAsync(response, command.Self, cancellationToken);
+        }
+    }
+
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types")]
+    private async Task SendTypingStatusPeriodicallyAsync(
+        ChatId chatId,
+        Task completionTask,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (!completionTask.IsCompleted)
+            {
+                await _bot.SendChatAction(chatId, ChatAction.Typing, cancellationToken: cancellationToken);
+
+                var delayTask = Task.Delay(TimeSpan.FromSeconds(4), cancellationToken);
+                await Task.WhenAny(completionTask, delayTask);
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            Log.SendTypingStatusFailed(_logger, ex);
         }
     }
 
@@ -443,5 +476,8 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
 
         [LoggerMessage(Level = LogLevel.Error, Message = "Failed to convert to Telegram Markdown or send message")]
         public static partial void MarkdownConversionOrSendFailed(ILogger logger, Exception exception);
+
+        [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to send typing status")]
+        public static partial void SendTypingStatusFailed(ILogger logger, Exception exception);
     }
 }
