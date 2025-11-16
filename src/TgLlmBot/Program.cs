@@ -45,6 +45,7 @@ using TgLlmBot.Services.OpenRouter;
 using TgLlmBot.Services.Telegram.Markdown;
 using TgLlmBot.Services.Telegram.RequestHandler;
 using TgLlmBot.Services.Telegram.SelfInformation;
+using TgLlmBot.Services.Telegram.TypingStatus;
 
 namespace TgLlmBot;
 
@@ -188,6 +189,7 @@ public partial class Program
         // Background services
         builder.Services.AddHostedService<LlmRequestsBackgroundService>();
         builder.Services.AddHostedService<CleanupOldMessagesBackgroundService>();
+        builder.Services.AddHostedService<TypingStatusBackgroundService>();
 
         // LLM
         builder.Services.AddSingleton<ICostContextStorage, DefaultCostContextStorage>();
@@ -266,6 +268,38 @@ public partial class Program
         // OpenRouter stats
         builder.Services.AddSingleton(new DefaultOpenRouterKeyUsageProviderOptions(config.Llm.ApiKey));
         builder.Services.AddHttpClient<IOpenRouterKeyUsageProvider, DefaultOpenRouterKeyUsageProvider>();
+        // Channel to send typing status to chats
+        var startTypingStatusChannel = Channel.CreateBounded<StartTypingCommand>(new BoundedChannelOptions(20)
+        {
+            FullMode = BoundedChannelFullMode.DropWrite,
+            SingleReader = false,
+            SingleWriter = false,
+            AllowSynchronousContinuations = false
+        });
+        builder.Services.AddSingleton<ChannelWriter<StartTypingCommand>>(resolver =>
+        {
+            var hostLifetime = resolver.GetRequiredService<IHostApplicationLifetime>();
+            hostLifetime.ApplicationStopping.Register(() => startTypingStatusChannel.Writer.Complete());
+            return startTypingStatusChannel.Writer;
+        });
+        builder.Services.AddSingleton(startTypingStatusChannel.Reader);
+        // Channel to stop sending typing status to chats
+        var stopSendingTypingStatusChannel = Channel.CreateBounded<StopTypingCommand>(new BoundedChannelOptions(20)
+        {
+            FullMode = BoundedChannelFullMode.DropWrite,
+            SingleReader = false,
+            SingleWriter = false,
+            AllowSynchronousContinuations = false
+        });
+        builder.Services.AddSingleton<ChannelWriter<StopTypingCommand>>(resolver =>
+        {
+            var hostLifetime = resolver.GetRequiredService<IHostApplicationLifetime>();
+            hostLifetime.ApplicationStopping.Register(() => stopSendingTypingStatusChannel.Writer.Complete());
+            return stopSendingTypingStatusChannel.Writer;
+        });
+        builder.Services.AddSingleton(stopSendingTypingStatusChannel.Reader);
+        // Typing sender service
+        builder.Services.AddSingleton<ITypingStatusService, TypingStatusService>();
         return builder;
     }
 

@@ -55,13 +55,13 @@ public class DefaultTelegramMessageStorage : ITelegramMessageStorage
             await using (var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken))
             {
                 var messageId = new NpgsqlParameter("messageId", message.MessageId);
-                var chatId = new NpgsqlParameter("chatId", message.Chat.Id);
+                var chatId = new NpgsqlParameter("ChatId", message.Chat.Id);
                 var sql = FormattableStringFactory.Create(
                     """
                     WITH target_message AS (
                         SELECT "Date" as cutoff_date
                         FROM public."ChatHistory"
-                        WHERE "MessageId" = @messageId AND "ChatId" = @chatId
+                        WHERE "MessageId" = @messageId AND "ChatId" = @ChatId
                     )
                     SELECT
                         "Id",
@@ -97,7 +97,7 @@ public class DefaultTelegramMessageStorage : ITelegramMessageStorage
                                      ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
                                      ) as cumulative_length
                              FROM public."ChatHistory" ch
-                             WHERE "ChatId" = @chatId
+                             WHERE "ChatId" = @ChatId
                                AND "Date" <= (SELECT cutoff_date FROM target_message)
                                AND "MessageId" != @messageId
                                AND NOT EXISTS (
