@@ -29,6 +29,10 @@ public partial class TypingStatusBackgroundService : BackgroundService
         TelegramBotClient bot,
         ILogger<TypingStatusBackgroundService> logger)
     {
+        ArgumentNullException.ThrowIfNull(startTypingChannelReader);
+        ArgumentNullException.ThrowIfNull(stopTypingChannelReader);
+        ArgumentNullException.ThrowIfNull(bot);
+        ArgumentNullException.ThrowIfNull(logger);
         _startTypingChannelReader = startTypingChannelReader;
         _stopTypingChannelReader = stopTypingChannelReader;
         _bot = bot;
