@@ -4,13 +4,9 @@ namespace TgLlmBot.Commands.Model;
 
 public class ModelCommandHandlerOptions
 {
-    public ModelCommandHandlerOptions(string endpoint, string model)
+    public ModelCommandHandlerOptions(Uri endpoint, string model)
     {
-        if (string.IsNullOrWhiteSpace(endpoint))
-        {
-            throw new ArgumentException("Value cannot be null or whitespace.", nameof(endpoint));
-        }
-
+        ArgumentNullException.ThrowIfNull(endpoint);
         if (string.IsNullOrWhiteSpace(model))
         {
             throw new ArgumentException("Value cannot be null or whitespace.", nameof(model));
@@ -20,6 +16,6 @@ public class ModelCommandHandlerOptions
         Model = model;
     }
 
-    public string Endpoint { get; }
+    public Uri Endpoint { get; }
     public string Model { get; }
 }

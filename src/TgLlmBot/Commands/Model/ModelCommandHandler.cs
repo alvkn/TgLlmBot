@@ -41,13 +41,25 @@ public class ModelCommandHandler : AbstractCommandHandler<ModelCommand>
             cancellationToken: cancellationToken);
     }
 
-    private static string BuildResponseTemplate(ITelegramMarkdownConverter markdownConverter, string model, string endpoint)
+    private static string BuildResponseTemplate(ITelegramMarkdownConverter markdownConverter, string model, Uri endpoint)
     {
+        var baseUri = GetBaseUrl(endpoint);
         var builder = new StringBuilder();
-        builder.Append("Провайдер: `").Append(endpoint).AppendLine("`");
+        builder.Append("Провайдер: `").Append(baseUri).AppendLine("`");
         builder.Append("Модель: `").Append(model).AppendLine("`");
         var rawMarkdown = builder.ToString();
         var optimizedMarkdown = markdownConverter.ConvertToTelegramMarkdown(rawMarkdown);
         return optimizedMarkdown;
+    }
+
+    private static string GetBaseUrl(Uri uri)
+    {
+        ArgumentNullException.ThrowIfNull(uri);
+        if (!uri.IsAbsoluteUri)
+        {
+            throw new ArgumentException("URI должен быть абсолютным", nameof(uri));
+        }
+
+        return uri.GetComponents(UriComponents.SchemeAndServer, UriFormat.Unescaped);
     }
 }
