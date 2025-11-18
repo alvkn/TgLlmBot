@@ -164,7 +164,7 @@ public partial class Program
         builder.Services.AddSingleton(new DisplayHelpCommandHandlerOptions(config.Telegram.BotName));
         builder.Services.AddSingleton<DisplayHelpCommandHandler>();
         builder.Services.AddSingleton<ChatWithLlmCommandHandler>();
-        builder.Services.AddSingleton(new ModelCommandHandlerOptions(config.Llm.Endpoint.ToString(), config.Llm.Model));
+        builder.Services.AddSingleton(new ModelCommandHandlerOptions(config.Llm.Endpoint, config.Llm.Model));
         builder.Services.AddSingleton<ModelCommandHandler>();
         builder.Services.AddSingleton<PingCommandHandler>();
         builder.Services.AddSingleton<RepoCommandHandler>();
