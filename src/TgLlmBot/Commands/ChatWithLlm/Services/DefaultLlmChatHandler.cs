@@ -100,9 +100,9 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
             {
                 ConversationId = Guid.NewGuid().ToString("N"),
                 Tools = [..tools],
-                Temperature = 0.8f,
-                TopK = 40,
-                TopP = 0.8f,
+                // Temperature = 0.8f,
+                // TopK = 40,
+                // TopP = 0.8f,
                 AllowMultipleToolCalls = true
             };
             var llmResponse = await _chatClient.GetResponseAsync(context, chatOptions, cancellationToken);
