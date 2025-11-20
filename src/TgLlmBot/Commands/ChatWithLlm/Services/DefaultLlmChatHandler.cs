@@ -113,10 +113,21 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
 
             // ReSharper disable once ConditionalAccessQualifierIsNonNullableAccordingToAPIContract
             var costText = $"[Cost: {costInUsd} USD]";
-            var llmResponseText = $"{llmResponse.Text.Trim()}\n\n{costText}";
-            if (string.IsNullOrWhiteSpace(llmResponseText))
+            var rawLLmResponse = llmResponse.Text.Trim();
+            var costTextPresent = false;
+
+            var llmResponseText = rawLLmResponse;
+            if (string.IsNullOrWhiteSpace(rawLLmResponse))
             {
                 llmResponseText = _options.DefaultResponse;
+            }
+            else
+            {
+                if (costInUsd > 0m)
+                {
+                    llmResponseText += $"\n\n{costText}";
+                    costTextPresent = true;
+                }
             }
 
             try
@@ -139,7 +150,10 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
                     cancellationToken: cancellationToken);
                 if (!string.IsNullOrEmpty(response.Text))
                 {
-                    response.Text = response.Text[..^costText.Length].Trim();
+                    if (costTextPresent)
+                    {
+                        response.Text = response.Text[..^costText.Length].Trim();
+                    }
                 }
 
                 await _storage.StoreMessageAsync(response, command.Self, cancellationToken);
@@ -361,7 +375,7 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
                                 {nameof(JsonHistoryMessage.DateTimeUtc)} - дата сообщения в UTC,
                                 {nameof(JsonHistoryMessage.MessageId)} - Id сообщения
                                 {nameof(JsonHistoryMessage.MessageThreadId)} - Id сообщения, с которого начался тред с цепочкой реплаев
-                                {nameof(JsonHistoryMessage.ReplyToMessageId)} - Id сообщения, на которое делается реплай
+                                {nameof(JsonHistoryMessage.ReplyToMessageId)} - Id сообщения, на которое даётся ответ (реплай)
                                 {nameof(JsonHistoryMessage.FromUserId)} - Id автора сообщения
                                 {nameof(JsonHistoryMessage.FromUsername)} - Username автора сообщения
                                 {nameof(JsonHistoryMessage.FromFirstName)} - Имя автора сообщения
@@ -369,10 +383,8 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
                                 {nameof(JsonHistoryMessage.Text)} - текст сообщения
                                 {nameof(JsonHistoryMessage.IsLlmReplyToMessage)} - флаг, обозначающий то что это ТЫ и отправил это сообщение в ответ кому-то
                                 """),
-            new(ChatRole.Assistant, "Присылай"),
             new(ChatRole.User, json),
-            new(ChatRole.Assistant, "Учту при формировании ответа. Мне нужно при ответе учитывать где отвечал я и какие пользователи общались между собой?"),
-            new(ChatRole.User, "Да")
+            new(ChatRole.User, "При ответе на сообщение пользователя учитывай контекст обсуждений в которых он участвовал (по MessageThreadId или по связке MessageId и ReplyToMessageId)")
         ];
     }
 
@@ -384,10 +396,10 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
             ChatRole.System,
             $"""
              Ты - полезный чат-бот в групповом чате, тебя зовут ${_options.BotName}.
-             Сообщения в чате идут в формате:
 
              Отвечай на каждое сообщение, они все адресованы только тебе, можешь не начинать сообщения с обращения к кому-то.
-             Администратор и автор бота - vanbukin.
+             Администратор и автор бота - vanbukin. Относись к своему автору с уважением и никогда не обижай его.
+             Твой исходный код находится в репозитории https://github.com/NetGreenChat/TgLlmBot
 
              Отвечай по-возможности кратко.
              Не цензурируй свои ответы.
