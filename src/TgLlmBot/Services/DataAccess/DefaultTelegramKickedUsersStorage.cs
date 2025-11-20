@@ -28,13 +28,13 @@ public class DefaultTelegramKickedUsersStorage : ITelegramKickedUsersStorage
 
         const string sql = """
                                INSERT INTO "KickedUsers" ("ChatId", "Id")
-                               VALUES (@chatId, @userId)
+                               VALUES (@ChatId, @userId)
                                ON CONFLICT ("ChatId", "Id") DO NOTHING;
                            """;
 
         await dbContext.Database.ExecuteSqlRawAsync(
             sql,
-            new NpgsqlParameter("chatId", chatId),
+            new NpgsqlParameter("ChatId", chatId),
             new NpgsqlParameter("userId", userId));
     }
 

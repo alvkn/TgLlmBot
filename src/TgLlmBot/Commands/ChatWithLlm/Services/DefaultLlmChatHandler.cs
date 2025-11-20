@@ -20,6 +20,7 @@ using TgLlmBot.Services.DataAccess;
 using TgLlmBot.Services.Mcp.Tools;
 using TgLlmBot.Services.OpenAIClient.Costs;
 using TgLlmBot.Services.Telegram.Markdown;
+using TgLlmBot.Services.Telegram.TypingStatus;
 using ChatMessage = Microsoft.Extensions.AI.ChatMessage;
 
 namespace TgLlmBot.Commands.ChatWithLlm.Services;
@@ -44,6 +45,7 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
     private readonly ITelegramMarkdownConverter _telegramMarkdownConverter;
     private readonly TimeProvider _timeProvider;
     private readonly IMcpToolsProvider _tools;
+    private readonly ITypingStatusService _typingStatusService;
 
     public DefaultLlmChatHandler(
         DefaultLlmChatHandlerOptions options,
@@ -54,7 +56,8 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
         ITelegramMessageStorage storage,
         IMcpToolsProvider tools,
         ILogger<DefaultLlmChatHandler> logger,
-        ICostContextStorage costContextStorage)
+        ICostContextStorage costContextStorage,
+        ITypingStatusService typingStatusService)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(timeProvider);
@@ -65,6 +68,7 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
         ArgumentNullException.ThrowIfNull(tools);
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(costContextStorage);
+        ArgumentNullException.ThrowIfNull(typingStatusService);
         _options = options;
         _timeProvider = timeProvider;
         _bot = bot;
@@ -74,6 +78,7 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
         _costContextStorage = costContextStorage;
         _storage = storage;
         _tools = tools;
+        _typingStatusService = typingStatusService;
     }
 
     [SuppressMessage("Design", "CA1031:Do not catch general exception types")]
@@ -85,7 +90,7 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
             _costContextStorage.Initialize();
             Log.ProcessingLlmRequest(_logger, command.Message.From?.Username, command.Message.From?.Id);
 
-            await _bot.SendChatAction(command.Message.Chat, ChatAction.Typing, cancellationToken: cancellationToken);
+            _typingStatusService.StartTyping(command.Message.Chat.Id);
 
             var contextMessages = await _storage.SelectContextMessagesAsync(command.Message, cancellationToken);
             byte[]? image = null;
@@ -128,6 +133,7 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
                     markdownReplyText = $"{markdownReplyText[..4000]}\n(response cut)";
                 }
 
+                _typingStatusService.StopTyping(command.Message.Chat.Id);
                 var response = await _bot.SendMessage(
                     command.Message.Chat,
                     markdownReplyText,
@@ -147,6 +153,7 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
             catch (Exception ex)
             {
                 Log.MarkdownConversionOrSendFailed(_logger, ex);
+                _typingStatusService.StopTyping(command.Message.Chat.Id);
                 var response = await _bot.SendMessage(
                     command.Message.Chat,
                     llmResponseText,
@@ -167,6 +174,7 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
         catch (Exception ex)
         {
             Log.LlmInvocationOrImageProcessingFailed(_logger, ex);
+
             var response = await _bot.SendMessage(
                 command.Message.Chat,
                 ex.Message,
@@ -457,5 +465,8 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
 
         [LoggerMessage(Level = LogLevel.Error, Message = "Failed to convert to Telegram Markdown or send message")]
         public static partial void MarkdownConversionOrSendFailed(ILogger logger, Exception exception);
+
+        [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to send typing status")]
+        public static partial void SendTypingStatusFailed(ILogger logger, Exception exception);
     }
 }
