@@ -175,7 +175,8 @@ public partial class RatingCommandHandler : AbstractCommandHandler<RatingCommand
 
             // Common Russian shitpost words/phrases
             var lowerText = text.ToLowerInvariant();
-            string[] russianShitpostWords = [
+            string[] russianShitpostWords =
+            [
                 "лол", "кек", "пепе", "жиза", "жесть", "угар", "ору", "ржу", "орнул",
                 "кринж", "краш", "агонь", "ахуе", "збс", "топ", "база", "кек чебурек",
                 "бомбит", "триггер", "рофл", "лул", "лмао", "пон", "хз", "имхо", "кмк",
@@ -199,7 +200,8 @@ public partial class RatingCommandHandler : AbstractCommandHandler<RatingCommand
         var lower = text.ToLowerInvariant();
 
         // Check for repeated sequences (English and Russian)
-        string[] patterns = [
+        string[] patterns =
+        [
             // English
             "ha", "he", "lo", "ke",
             // Russian laughter

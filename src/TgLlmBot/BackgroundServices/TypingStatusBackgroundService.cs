@@ -16,12 +16,12 @@ public partial class TypingStatusBackgroundService : BackgroundService
 {
     private const int TypingIntervalMs = 4_000;
 
-    private readonly ChannelReader<StartTypingCommand> _startTypingChannelReader;
-    private readonly ChannelReader<StopTypingCommand> _stopTypingChannelReader;
+    private readonly ConcurrentDictionary<long, CancellationTokenSource> _activeTypingTimersCts = new();
     private readonly TelegramBotClient _bot;
     private readonly ILogger<TypingStatusBackgroundService> _logger;
 
-    private readonly ConcurrentDictionary<long, CancellationTokenSource> _activeTypingTimersCts = new();
+    private readonly ChannelReader<StartTypingCommand> _startTypingChannelReader;
+    private readonly ChannelReader<StopTypingCommand> _stopTypingChannelReader;
 
     public TypingStatusBackgroundService(
         ChannelReader<StartTypingCommand> startTypingChannelReader,
