@@ -100,6 +100,13 @@ public class ModifyChatCompletionsRequestDelegatingHandler : DelegatingHandler
                     property.WriteTo(writer);
                 }
 
+                // reasoning
+                writer.WritePropertyName("reasoning");
+                writer.WriteStartObject();
+                writer.WritePropertyName("effort");
+                writer.WriteStringValue("high");
+                writer.WriteEndObject();
+                // usage
                 writer.WritePropertyName("usage");
                 writer.WriteStartObject();
                 writer.WriteBoolean("include", true);
