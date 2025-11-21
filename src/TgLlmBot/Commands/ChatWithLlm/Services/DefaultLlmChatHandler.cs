@@ -189,6 +189,7 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
         catch (Exception ex)
         {
             Log.LlmInvocationOrImageProcessingFailed(_logger, ex);
+            _typingStatusService.StopTyping(command.Message.Chat.Id);
 
             var response = await _bot.SendMessage(
                 command.Message.Chat,
