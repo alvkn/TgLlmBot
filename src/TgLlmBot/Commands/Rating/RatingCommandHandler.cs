@@ -231,10 +231,12 @@ public class RatingCommandHandler : AbstractCommandHandler<RatingCommand>
             builder.AppendLine(CultureInfo.InvariantCulture, $"{medal} #{rank}: `{userData.Name}`");
             builder.AppendLine(CultureInfo.InvariantCulture, $"   Степень кринжа: {userData.Level:D}/100");
             builder.AppendLine();
-            builder.Append("Проанализировано: ");
-            builder.Append(contextMessages.Length);
-            builder.AppendLine(" сообщений");
         }
+
+        builder.AppendLine();
+        builder.Append("Проанализировано: ");
+        builder.Append(contextMessages.Length);
+        builder.AppendLine(" сообщений");
 
         return builder.ToString();
     }
