@@ -64,18 +64,17 @@ public sealed partial class DefaultTelegramRequestHandler : ITelegramRequestHand
             return;
         }
 
+        var isMessageTooOld = message.Date < _options.SkipMessagesOlderThan;
+        var isNewMessage = type == UpdateType.Message;
+        var isChatAllowed = _options.AllowedChatIds.Contains(message.Chat.Id);
+
+        if (isMessageTooOld || !isNewMessage || !isChatAllowed)
+        {
+            return;
+        }
+
         try
         {
-            if (message.Date < _options.SkipMessagesOlderThan)
-            {
-                return;
-            }
-
-            if (!_options.AllowedChatIds.Contains(message.Chat.Id))
-            {
-                return;
-            }
-
             await _commandDispatcher.HandleMessageAsync(message, type, cancellationToken);
         }
         catch (Exception ex)
