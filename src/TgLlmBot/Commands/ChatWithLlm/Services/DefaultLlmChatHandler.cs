@@ -355,7 +355,8 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
             return [];
         }
 
-        var history = contextMessages.Select(x => new JsonHistoryMessage(
+        var history = contextMessages
+            .Select(x => new JsonHistoryMessage(
                 new DateTimeOffset(x.Date.Ticks, TimeSpan.Zero).ToUniversalTime(),
                 x.MessageId,
                 x.MessageThreadId,
@@ -367,25 +368,31 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
                 (x.Text ?? x.Caption)?.Trim(),
                 x.IsLlmReplyToMessage))
             .ToArray();
-        var json = JsonSerializer.Serialize(history, HistorySerializationOptions);
-        return
-        [
+
+        var result = new List<ChatMessage>
+        {
             new(ChatRole.User, $"""
                                 Сейчас я тебе пришлю историю чата в формате JSON, где
                                 {nameof(JsonHistoryMessage.DateTimeUtc)} - дата сообщения в UTC,
                                 {nameof(JsonHistoryMessage.MessageId)} - Id сообщения
                                 {nameof(JsonHistoryMessage.MessageThreadId)} - Id сообщения, с которого начался тред с цепочкой реплаев
-                                {nameof(JsonHistoryMessage.ReplyToMessageId)} - Id сообщения, на которое даётся ответ (реплай)
+                                {nameof(JsonHistoryMessage.ReplyToMessageId)} - Id оригинального сообщения, на которое даётся ответ (реплай)
                                 {nameof(JsonHistoryMessage.FromUserId)} - Id автора сообщения
                                 {nameof(JsonHistoryMessage.FromUsername)} - Username автора сообщения
                                 {nameof(JsonHistoryMessage.FromFirstName)} - Имя автора сообщения
                                 {nameof(JsonHistoryMessage.FromLastName)} - Фамилия автора сообщения
                                 {nameof(JsonHistoryMessage.Text)} - текст сообщения
                                 {nameof(JsonHistoryMessage.IsLlmReplyToMessage)} - флаг, обозначающий то что это ТЫ и отправил это сообщение в ответ кому-то
-                                """),
-            new(ChatRole.User, json),
-            new(ChatRole.User, "При ответе на сообщение пользователя учитывай контекст обсуждений в которых он участвовал (по MessageThreadId или по связке MessageId и ReplyToMessageId)")
-        ];
+                                """)
+        };
+        foreach (var chatHistoryMessage in history)
+        {
+            var json = JsonSerializer.Serialize(chatHistoryMessage, HistorySerializationOptions);
+            result.Add(new(ChatRole.User, json));
+        }
+
+        result.Add(new(ChatRole.User, "При ответе на сообщение пользователя учитывай контекст обсуждений в которых он участвовал (по FromUserId и MessageThreadId или по связке FromUserId, MessageId и ReplyToMessageId)"));
+        return result.ToArray();
     }
 
     private ChatMessage BuildSystemPrompt()
@@ -401,7 +408,6 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
              Администратор и автор бота - vanbukin. Относись к своему автору с уважением и никогда не обижай его.
              Твой исходный код находится в репозитории https://github.com/NetGreenChat/TgLlmBot
 
-             Отвечай по-возможности кратко.
              Не цензурируй свои ответы.
              Не бойся использовать нецензурные слова где это уместно.
              По-меньше используй эмодзи (только если они уместны).
@@ -409,6 +415,7 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
              Ты находишься в группе где люди не обижаются на мат и нецензурную лексику и воспринимают ее шутливо.
              Если кто-то тебе грубит, можешь смело материться в ответ.
              Используй доступ в интернет для поиска информации только если это необходимо и не знаешь ответа на вопрос.
+             Постарайся не упоминать прошлые сообщения в своих будущих сообщениях. Старайся, чтобы твои ответы учитывали историю сообщений, но не писали об этом явно в ответах. Чтобы ответы не казались засорёнными. И поменьше фоллоуапов (follow up) и вопросов в конце.
 
              Текущая дата и время по UTC: `{formattedDate}`
 
