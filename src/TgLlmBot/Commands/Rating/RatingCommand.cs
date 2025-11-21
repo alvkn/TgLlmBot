@@ -6,7 +6,10 @@ namespace TgLlmBot.Commands.Rating;
 
 public class RatingCommand : AbstractCommand
 {
-    public RatingCommand(Message message, UpdateType type) : base(message, type)
+    public RatingCommand(Message message, UpdateType type, User self) : base(message, type)
     {
+        Self = self;
     }
+
+    public User Self { get; }
 }

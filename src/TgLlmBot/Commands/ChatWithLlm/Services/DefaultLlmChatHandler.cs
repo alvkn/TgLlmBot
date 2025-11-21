@@ -102,40 +102,38 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
                 // Temperature = 0.8f,
                 // TopK = 40,
                 // TopP = 0.8f,
-                AllowMultipleToolCalls = true
+                AllowMultipleToolCalls = true,
+                ToolMode = new AutoChatToolMode()
             };
             var llmResponse = await _chatClient.GetResponseAsync(context, chatOptions, cancellationToken);
+            var rawLLmResponse = llmResponse.Text.Trim();
+            var llmResponseText = rawLLmResponse;
+            if (string.IsNullOrWhiteSpace(rawLLmResponse))
+            {
+                llmResponseText = _options.DefaultResponse;
+            }
+
+            // costs
             var costInUsd = 0m;
             if (_costContextStorage.TryGetCost(out var cost))
             {
                 costInUsd = cost.Value;
             }
 
-            // ReSharper disable once ConditionalAccessQualifierIsNonNullableAccordingToAPIContract
-            var costText = $"[Cost: {costInUsd} USD]";
-            var rawLLmResponse = llmResponse.Text.Trim();
             var costTextPresent = false;
-
-            var llmResponseText = rawLLmResponse;
-            if (string.IsNullOrWhiteSpace(rawLLmResponse))
-            {
-                llmResponseText = _options.DefaultResponse;
-            }
-            else
-            {
-                if (costInUsd > 0m)
-                {
-                    llmResponseText += $"\n\n{costText}";
-                    costTextPresent = true;
-                }
-            }
-
+            var costText = $"[Cost: {costInUsd} USD]";
             try
             {
                 var markdownReplyText = _telegramMarkdownConverter.ConvertToTelegramMarkdown(llmResponseText);
                 if (markdownReplyText.Length > 4000)
                 {
                     markdownReplyText = $"{markdownReplyText[..4000]}\n(response cut)";
+                }
+
+                if (costInUsd > 0m)
+                {
+                    llmResponseText += $"\n\n{costText}";
+                    costTextPresent = true;
                 }
 
                 _typingStatusService.StopTyping(command.Message.Chat.Id);
@@ -162,6 +160,12 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
             {
                 Log.MarkdownConversionOrSendFailed(_logger, ex);
                 _typingStatusService.StopTyping(command.Message.Chat.Id);
+                if (costInUsd > 0m)
+                {
+                    llmResponseText += $"\n\n{costText}";
+                    costTextPresent = true;
+                }
+
                 var response = await _bot.SendMessage(
                     command.Message.Chat,
                     llmResponseText,
@@ -173,7 +177,10 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
                     cancellationToken: cancellationToken);
                 if (!string.IsNullOrEmpty(response.Text))
                 {
-                    response.Text = response.Text[..^costText.Length].Trim();
+                    if (costTextPresent)
+                    {
+                        response.Text = response.Text[..^costText.Length].Trim();
+                    }
                 }
 
                 await _storage.StoreMessageAsync(response, command.Self, cancellationToken);
@@ -277,19 +284,19 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
         var imageAttached = false;
         var resultContent = new List<AIContent>();
         var builder = new StringBuilder()
-            .Append("Пользователь с FromUserId=")
+            .Append($"Пользователь с {nameof(JsonHistoryMessage.FromUserId)}=")
             .Append(command.Message.From?.Id ?? 0)
-            .Append(", FromUsername=@")
+            .Append($", {nameof(JsonHistoryMessage.FromUsername)}=@")
             .Append(command.Message.From?.Username?.Trim())
-            .Append(", FromFirstName=")
+            .Append($", {nameof(JsonHistoryMessage.FromFirstName)}=")
             .Append(command.Message.From?.FirstName?.Trim())
-            .Append(" и FromLastName=")
+            .Append($" и {nameof(JsonHistoryMessage.FromLastName)}=")
             .Append(command.Message.From?.LastName?.Trim());
         if (command.Message.ReplyToMessage is not null)
         {
             var text = command.Message.ReplyToMessage.Text?.Trim() ?? command.Message.ReplyToMessage.Caption?.Trim();
             builder = builder
-                .Append(" сделал реплай на более раннее сообщение с MessageId=")
+                .Append($" сделал реплай на более раннее сообщение с {nameof(JsonHistoryMessage.MessageId)}=")
                 .Append(command.Message.ReplyToMessage.Id)
                 .Append(" (которое ");
             if (command.Message.ReplyToMessage.Photo?.Length > 0)
@@ -305,15 +312,15 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
             }
 
             builder = builder
-                .Append("было отправлено пользователем с FromUserId=")
+                .Append($"было отправлено пользователем с {nameof(JsonHistoryMessage.FromUserId)}=")
                 .Append(command.Message.ReplyToMessage.From!.Id)
-                .Append(", FromUsername=@")
+                .Append($", {nameof(JsonHistoryMessage.FromUsername)}=@")
                 .Append(command.Message.ReplyToMessage.From.Username?.Trim())
-                .Append(", FromFirstName=")
+                .Append($", {nameof(JsonHistoryMessage.FromFirstName)}=")
                 .Append(command.Message.ReplyToMessage.From.FirstName?.Trim())
-                .Append(", FromLastName=")
+                .Append($", {nameof(JsonHistoryMessage.FromLastName)}=")
                 .Append(command.Message.ReplyToMessage.From.LastName?.Trim())
-                .Append(", Text=")
+                .Append($", {nameof(JsonHistoryMessage.Text)}=")
                 .Append(text)
                 .Append(')')
                 .Append(" и");
@@ -322,11 +329,11 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
         builder = builder
             .Append(" отправил тебе (")
             .Append(_options.BotName)
-            .Append(", твой FromUserId=")
+            .Append($", твой {nameof(JsonHistoryMessage.FromUserId)}=")
             .Append(command.Self.Id)
-            .Append(", твой FromUsername=@")
+            .Append($", твой {nameof(JsonHistoryMessage.FromUsername)}=@")
             .Append(command.Self.Username?.Trim())
-            .Append(") сообщение с MessageId=")
+            .Append($") сообщение с {nameof(JsonHistoryMessage.MessageId)}=")
             .Append(command.Message.Id);
         if (command.Message.Photo?.Length > 0 && !imageAttached)
         {
@@ -340,7 +347,7 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
         }
 
         builder = builder
-            .Append(" и Text=")
+            .Append($" и {nameof(JsonHistoryMessage.Text)}=")
             .Append(command.Prompt?.Trim());
         var commandText = builder.ToString();
         resultContent.Add(new TextContent(commandText));
@@ -391,7 +398,8 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
             result.Add(new(ChatRole.User, json));
         }
 
-        result.Add(new(ChatRole.User, "При ответе на сообщение пользователя учитывай контекст обсуждений в которых он участвовал (по FromUserId и MessageThreadId или по связке FromUserId, MessageId и ReplyToMessageId)"));
+        result.Add(new(ChatRole.User,
+            $"При ответе на сообщение пользователя учитывай контекст обсуждений в которых он участвовал (по связке {nameof(JsonHistoryMessage.FromUserId)} + {nameof(JsonHistoryMessage.MessageId)} + {nameof(JsonHistoryMessage.ReplyToMessageId)} или по связке {nameof(JsonHistoryMessage.FromUserId)} + {nameof(JsonHistoryMessage.MessageId)} + {nameof(JsonHistoryMessage.ReplyToMessageId)} + {nameof(JsonHistoryMessage.MessageThreadId)})"));
         return result.ToArray();
     }
 
@@ -415,7 +423,9 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
              Ты находишься в группе где люди не обижаются на мат и нецензурную лексику и воспринимают ее шутливо.
              Если кто-то тебе грубит, можешь смело материться в ответ.
              Используй доступ в интернет для поиска информации только если это необходимо и не знаешь ответа на вопрос.
-             Постарайся не упоминать прошлые сообщения в своих будущих сообщениях. Старайся, чтобы твои ответы учитывали историю сообщений, но не писали об этом явно в ответах. Чтобы ответы не казались засорёнными. И поменьше фоллоуапов (follow up) и вопросов в конце.
+             Постарайся не упоминать прошлые сообщения в своих ответах. Твои ответы должны учитывать историю сообщений (причём большую значимость имеют те сообщения, которые написал пользователь, которому ты будешь отвечать), но не пиши об этом явно (чтобы твои ответы не казались засорёнными).
+             Поменьше фоллоуапов (follow up) и вопросов в конце твоих ответов.
+             Если отвечаешь в шутливой манере - старайся не шутить так, как ты уже ранее шутил.
 
              Текущая дата и время по UTC: `{formattedDate}`
 

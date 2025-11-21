@@ -121,7 +121,7 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
                 }
             case "!rating":
                 {
-                    var command = new RatingCommand(message, type);
+                    var command = new RatingCommand(message, type, self);
                     await _ratingCommandHandler.HandleAsync(command, cancellationToken);
                     return;
                 }
