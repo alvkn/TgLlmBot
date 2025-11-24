@@ -121,13 +121,14 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
             }
 
             var costTextPresent = false;
-            var costText = $"[Cost: {costInUsd} USD]";
+            var rawCostText = $"[Cost: {costInUsd} USD]";
+            var markdownCostText = _telegramMarkdownConverter.ConvertToSolidTelegramMarkdown(rawCostText);
             try
             {
                 var finalText = _telegramMarkdownConverter.ConvertToPartedTelegramMarkdown(llmResponseText);
                 if (costInUsd > 0m)
                 {
-                    finalText[^1] += $"\n\n{costText}";
+                    finalText[^1] += $"\n\n{markdownCostText}";
                     costTextPresent = true;
                 }
 
@@ -160,7 +161,7 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
 
                     if (!string.IsNullOrEmpty(response.Text) && costTextPresent && lastPart)
                     {
-                        response.Text = response.Text[..^costText.Length].Trim();
+                        response.Text = response.Text[..^markdownCostText.Length].Trim();
                     }
 
                     await _storage.StoreMessageAsync(response, command.Self, cancellationToken);
@@ -173,7 +174,7 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
                 var finalText = llmResponseText;
                 if (costInUsd > 0m)
                 {
-                    finalText += $"\n\n{costText}";
+                    finalText += $"\n\n{rawCostText}";
                     costTextPresent = true;
                 }
 
@@ -190,7 +191,7 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
                 {
                     if (costTextPresent)
                     {
-                        response.Text = response.Text[..^costText.Length].Trim();
+                        response.Text = response.Text[..^rawCostText.Length].Trim();
                     }
                 }
 
