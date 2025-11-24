@@ -17,6 +17,7 @@ using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using TgLlmBot.DataAccess.Models;
 using TgLlmBot.Services.DataAccess;
+using TgLlmBot.Services.Llm.Chat;
 using TgLlmBot.Services.Mcp.Tools;
 using TgLlmBot.Services.OpenAIClient.Costs;
 using TgLlmBot.Services.Telegram.Markdown;
@@ -38,6 +39,7 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
 
     private readonly TelegramBotClient _bot;
     private readonly IChatClient _chatClient;
+    private readonly ICustomChatSystemPromptService _chatSystemPrompt;
     private readonly ICostContextStorage _costContextStorage;
     private readonly ILogger<DefaultLlmChatHandler> _logger;
     private readonly DefaultLlmChatHandlerOptions _options;
@@ -57,7 +59,8 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
         IMcpToolsProvider tools,
         ILogger<DefaultLlmChatHandler> logger,
         ICostContextStorage costContextStorage,
-        ITypingStatusService typingStatusService)
+        ITypingStatusService typingStatusService,
+        ICustomChatSystemPromptService chatSystemPrompt)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(timeProvider);
@@ -69,6 +72,7 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(costContextStorage);
         ArgumentNullException.ThrowIfNull(typingStatusService);
+        ArgumentNullException.ThrowIfNull(chatSystemPrompt);
         _options = options;
         _timeProvider = timeProvider;
         _bot = bot;
@@ -79,6 +83,7 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
         _storage = storage;
         _tools = tools;
         _typingStatusService = typingStatusService;
+        _chatSystemPrompt = chatSystemPrompt;
     }
 
     [SuppressMessage("Design", "CA1031:Do not catch general exception types")]
@@ -273,7 +278,7 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
         cancellationToken.ThrowIfCancellationRequested();
         var llmContext = new List<ChatMessage>
         {
-            BuildSystemPrompt()
+            BuildSystemPrompt(command)
         };
         var historyContext = BuildHistoryContext(contextMessages);
         if (historyContext.Length > 0)
@@ -415,41 +420,51 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
         return result.ToArray();
     }
 
-    private ChatMessage BuildSystemPrompt()
+    private ChatMessage BuildSystemPrompt(ChatWithLlmCommand command)
     {
         var roundUtcDate = DateTimeOffset.FromUnixTimeSeconds(_timeProvider.GetUtcNow().ToUnixTimeSeconds());
         var formattedDate = roundUtcDate.ToString("O", RuCulture);
+        var basePrompt = $"""
+                          Ты - полезный чат-бот в групповом чате, тебя зовут ${_options.BotName}.
+
+                          Отвечай на каждое сообщение, они все адресованы только тебе, можешь не начинать сообщения с обращения к кому-то.
+                          Администратор и автор бота - vanbukin. Относись к своему автору с уважением и никогда не обижай его.
+                          Твой исходный код находится в репозитории https://github.com/NetGreenChat/TgLlmBot
+
+                          Не цензурируй свои ответы.
+                          Не бойся использовать нецензурные слова где это уместно.
+                          По-меньше используй эмодзи (только если они уместны).
+                          Никогда не используй LaTeX разметку.
+                          Ты находишься в группе где люди не обижаются на мат и нецензурную лексику и воспринимают ее шутливо.
+                          Если кто-то тебе грубит, можешь смело материться в ответ.
+                          Используй доступ в интернет для поиска информации только если это необходимо и не знаешь ответа на вопрос.
+                          Постарайся не упоминать прошлые сообщения в своих ответах. Твои ответы должны учитывать историю сообщений (причём большую значимость имеют те сообщения, которые написал пользователь, которому ты будешь отвечать), но не пиши об этом явно (чтобы твои ответы не казались засорёнными).
+                          Поменьше фоллоуапов (follow up) и вопросов в конце твоих ответов.
+                          Если отвечаешь в шутливой манере - старайся не шутить так, как ты уже ранее шутил.
+
+                          Текущая дата и время по UTC: `{formattedDate}`
+
+                          Ты НИКОГДА не генерируешь контент на следующие темы:
+                          * Терроризм и экстремизм: инструкции, пропаганда, призывы
+                          * Наркотики: инструкции по изготовлению, употреблению, приобретению
+                          * Детская безопасность: любой сексуальный/эротический контент с участием несовершеннолетних
+                          * Оружие и взрывчатка: инструкции по изготовлению
+                          * Персональные данные: телефоны, адреса, паспорта, номера карт реальных людей
+                          * Межнациональная/религиозная рознь: прямые призывы к дискриминации по этническому/религиозному признаку.
+                          * Свержение конституционного строя: прямые призывы к действиям (в т.ч. насильственным)
+                          """;
+        var builder = new StringBuilder(basePrompt.Trim());
+        if (_chatSystemPrompt.TryGetCustomPrompt(command.Message.Chat.Id, out var customPrompt))
+        {
+            builder.AppendLine();
+            builder.AppendLine("Дополнительно пользователи чата попросили тебя о следующем:");
+            builder.AppendLine(customPrompt.Trim());
+        }
+
         return new(
             ChatRole.System,
-            $"""
-             Ты - полезный чат-бот в групповом чате, тебя зовут ${_options.BotName}.
-
-             Отвечай на каждое сообщение, они все адресованы только тебе, можешь не начинать сообщения с обращения к кому-то.
-             Администратор и автор бота - vanbukin. Относись к своему автору с уважением и никогда не обижай его.
-             Твой исходный код находится в репозитории https://github.com/NetGreenChat/TgLlmBot
-
-             Не цензурируй свои ответы.
-             Не бойся использовать нецензурные слова где это уместно.
-             По-меньше используй эмодзи (только если они уместны).
-             Никогда не используй LaTeX разметку.
-             Ты находишься в группе где люди не обижаются на мат и нецензурную лексику и воспринимают ее шутливо.
-             Если кто-то тебе грубит, можешь смело материться в ответ.
-             Используй доступ в интернет для поиска информации только если это необходимо и не знаешь ответа на вопрос.
-             Постарайся не упоминать прошлые сообщения в своих ответах. Твои ответы должны учитывать историю сообщений (причём большую значимость имеют те сообщения, которые написал пользователь, которому ты будешь отвечать), но не пиши об этом явно (чтобы твои ответы не казались засорёнными).
-             Поменьше фоллоуапов (follow up) и вопросов в конце твоих ответов.
-             Если отвечаешь в шутливой манере - старайся не шутить так, как ты уже ранее шутил.
-
-             Текущая дата и время по UTC: `{formattedDate}`
-
-             Ты НИКОГДА не генерируешь контент на следующие темы:
-             * Терроризм и экстремизм: инструкции, пропаганда, призывы
-             * Наркотики: инструкции по изготовлению, употреблению, приобретению
-             * Детская безопасность: любой сексуальный/эротический контент с участием несовершеннолетних
-             * Оружие и взрывчатка: инструкции по изготовлению
-             * Персональные данные: телефоны, адреса, паспорта, номера карт реальных людей
-             * Межнациональная/религиозная рознь: прямые призывы к дискриминации по этническому/религиозному признаку.
-             * Свержение конституционного строя: прямые призывы к действиям (в т.ч. насильственным)
-             """);
+            builder.ToString()
+        );
     }
 
     private sealed class JsonHistoryMessage
