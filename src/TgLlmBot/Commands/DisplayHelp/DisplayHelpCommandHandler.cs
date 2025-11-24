@@ -46,13 +46,18 @@ public class DisplayHelpCommandHandler : AbstractCommandHandler<DisplayHelpComma
         var builder = new StringBuilder();
         builder.Append('`').Append(botName).Append('`').AppendLine(" - префикс для того чтобы задать вопрос LLM");
         builder.AppendLine();
+        builder.AppendLine("Например:");
+        builder.Append('`').Append(botName).Append(" напиши Hello World на C#").Append('`').AppendLine();
+        builder.AppendLine();
         builder.AppendLine("`!ping` - проверка работоспособности бота");
         builder.AppendLine("`!model` - отображает текущую используемую LLM и endpoint к которому идут обращения");
         builder.AppendLine("`!repo` - ссылка на GitHub репозиторий с исходным кодом бота");
         builder.AppendLine("`!usage` - статистика использования API ключа");
         builder.AppendLine("`!rating` - измеряет уровень кринжа и показывает рейтинг щитпостеров");
+        builder.AppendLine("`!role` - изменяет системный промпт со стандартного на произвольный (например: `!role общайся на древнерусском`)");
+        builder.AppendLine("`!reset` - сбрасывает системный промпт на стандартный");
         var rawMarkdown = builder.ToString();
-        var optimizedMarkdown = markdownConverter.ConvertToTelegramMarkdown(rawMarkdown);
+        var optimizedMarkdown = markdownConverter.ConvertToSolidTelegramMarkdown(rawMarkdown);
         return optimizedMarkdown;
     }
 }

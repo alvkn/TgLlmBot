@@ -171,7 +171,7 @@ public class RatingCommandHandler : AbstractCommandHandler<RatingCommand>
         }
     }
 
-    private async Task RespondWithMarkdownAsync(RatingCommand command, string errorText, CancellationToken cancellationToken)
+    private async Task RespondWithMarkdownAsync(RatingCommand command, string text, CancellationToken cancellationToken)
     {
         var costInUsd = 0m;
         if (_costContextStorage.TryGetCost(out var cost))
@@ -181,14 +181,14 @@ public class RatingCommandHandler : AbstractCommandHandler<RatingCommand>
 
         var costTextPresent = false;
         var costText = $"[Cost: {costInUsd} USD]";
-        var responseText = errorText;
+        var responseText = text;
         if (costInUsd > 0m)
         {
             responseText += $"\n\n{costText}";
             costTextPresent = true;
         }
 
-        var telegramMarkdown = _telegramMarkdownConverter.ConvertToTelegramMarkdown(responseText);
+        var telegramMarkdown = _telegramMarkdownConverter.ConvertToSolidTelegramMarkdown(responseText);
         var response = await _bot.SendMessage(
             command.Message.Chat,
             telegramMarkdown,

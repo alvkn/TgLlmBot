@@ -73,7 +73,7 @@ public class UsageCommandHandler : AbstractCommandHandler<UsageCommand>
         builder.Append("Использовано: ").Append(keyStats.Usage.ToString("F3", CultureInfo.InvariantCulture)).AppendLine(" USD");
         builder.Append("Осталось: ").Append(keyStats.Remaining.ToString("F3", CultureInfo.InvariantCulture)).AppendLine(" USD");
         var rawMarkdown = builder.ToString();
-        var optimizedMarkdown = markdownConverter.ConvertToTelegramMarkdown(rawMarkdown);
+        var optimizedMarkdown = markdownConverter.ConvertToSolidTelegramMarkdown(rawMarkdown);
         return optimizedMarkdown;
     }
 }

@@ -10,6 +10,8 @@ using TgLlmBot.Commands.Model;
 using TgLlmBot.Commands.Ping;
 using TgLlmBot.Commands.Rating;
 using TgLlmBot.Commands.Repo;
+using TgLlmBot.Commands.ResetSystemPrompt;
+using TgLlmBot.Commands.SetSystemPrompt;
 using TgLlmBot.Commands.Usage;
 using TgLlmBot.Services.DataAccess;
 using TgLlmBot.Services.Telegram.SelfInformation;
@@ -34,7 +36,9 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
     private readonly PingCommandHandler _pingCommandHandler;
     private readonly RatingCommandHandler _ratingCommandHandler;
     private readonly RepoCommandHandler _repoCommandHandler;
+    private readonly ResetSystemPromptCommandHandler _resetSystemPromptCommandHandler;
     private readonly ITelegramSelfInformation _selfInformation;
+    private readonly SetSystemPromptCommandHandler _setSystemPromptCommandHandler;
     private readonly UsageCommandHandler _usageCommandHandler;
 
     public DefaultTelegramCommandDispatcher(
@@ -47,7 +51,9 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
         RepoCommandHandler repoCommandHandler,
         ModelCommandHandler modelCommandHandler,
         UsageCommandHandler usageCommandHandler,
-        RatingCommandHandler ratingCommandHandler)
+        RatingCommandHandler ratingCommandHandler,
+        SetSystemPromptCommandHandler setSystemPromptCommandHandler,
+        ResetSystemPromptCommandHandler resetSystemPromptCommandHandler)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(selfInformation);
@@ -59,6 +65,8 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
         ArgumentNullException.ThrowIfNull(modelCommandHandler);
         ArgumentNullException.ThrowIfNull(usageCommandHandler);
         ArgumentNullException.ThrowIfNull(ratingCommandHandler);
+        ArgumentNullException.ThrowIfNull(setSystemPromptCommandHandler);
+        ArgumentNullException.ThrowIfNull(resetSystemPromptCommandHandler);
         _options = options;
         _selfInformation = selfInformation;
         _messageStorage = messageStorage;
@@ -69,6 +77,8 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
         _modelCommandHandler = modelCommandHandler;
         _usageCommandHandler = usageCommandHandler;
         _ratingCommandHandler = ratingCommandHandler;
+        _setSystemPromptCommandHandler = setSystemPromptCommandHandler;
+        _resetSystemPromptCommandHandler = resetSystemPromptCommandHandler;
     }
 
     public async Task HandleMessageAsync(Message? message, UpdateType type, CancellationToken cancellationToken)
@@ -87,7 +97,9 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
 
         var self = _selfInformation.GetSelf();
         await _messageStorage.StoreMessageAsync(message, self, cancellationToken);
-        switch (message.Text?.Trim()?.ToLowerInvariant())
+        // ReSharper disable once ConditionalAccessQualifierIsNonNullableAccordingToAPIContract
+        var rawPrompt = $"{message.Text?.Trim()?.ToLowerInvariant()}";
+        switch (rawPrompt)
         {
             case "!help":
                 {
@@ -125,6 +137,19 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
                     await _ratingCommandHandler.HandleAsync(command, cancellationToken);
                     return;
                 }
+            case "!reset":
+                {
+                    var command = new ResetSystemPromptCommand(message, type, self);
+                    await _resetSystemPromptCommandHandler.HandleAsync(command, cancellationToken);
+                    return;
+                }
+        }
+
+        if (rawPrompt.StartsWith("!role", StringComparison.Ordinal))
+        {
+            var command = new SetSystemPromptCommand(message, type, self);
+            await _setSystemPromptCommandHandler.HandleAsync(command, cancellationToken);
+            return;
         }
 
         var prompt = message.Text ?? message.Caption;

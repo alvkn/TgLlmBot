@@ -28,6 +28,8 @@ using TgLlmBot.Commands.Model;
 using TgLlmBot.Commands.Ping;
 using TgLlmBot.Commands.Rating;
 using TgLlmBot.Commands.Repo;
+using TgLlmBot.Commands.ResetSystemPrompt;
+using TgLlmBot.Commands.SetSystemPrompt;
 using TgLlmBot.Commands.Usage;
 using TgLlmBot.Configuration.Options;
 using TgLlmBot.Configuration.TypedConfiguration;
@@ -35,6 +37,7 @@ using TgLlmBot.DataAccess;
 using TgLlmBot.DataAccess.Design;
 using TgLlmBot.Extensions.Configuration;
 using TgLlmBot.Services.DataAccess;
+using TgLlmBot.Services.Llm.Chat;
 using TgLlmBot.Services.Mcp.Clients.Brave;
 using TgLlmBot.Services.Mcp.Clients.Github;
 using TgLlmBot.Services.Mcp.Enums;
@@ -172,6 +175,8 @@ public partial class Program
         builder.Services.AddSingleton<UsageCommandHandler>();
         builder.Services.AddSingleton(new RatingCommandHandlerOptions(config.Telegram.BotName));
         builder.Services.AddSingleton<RatingCommandHandler>();
+        builder.Services.AddSingleton<ResetSystemPromptCommandHandler>();
+        builder.Services.AddSingleton<SetSystemPromptCommandHandler>();
         // Channel to communicate with LLM
         var llmRequestChannel = Channel.CreateBounded<ChatWithLlmCommand>(new BoundedChannelOptions(20)
         {
@@ -228,6 +233,7 @@ public partial class Program
         // LLM Chat
         builder.Services.AddSingleton(new DefaultLlmChatHandlerOptions(config.Telegram.BotName, config.Llm.DefaultResponse));
         builder.Services.AddSingleton<ILlmChatHandler, DefaultLlmChatHandler>();
+        builder.Services.AddSingleton<ICustomChatSystemPromptService, DefaultCustomChatSystemPromptService>();
         // DataAccess
         builder.Services.AddDbContext<BotDbContext>(dbContextOptions =>
         {

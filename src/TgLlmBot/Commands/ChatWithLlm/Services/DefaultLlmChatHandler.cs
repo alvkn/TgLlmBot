@@ -124,51 +124,62 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
             var costText = $"[Cost: {costInUsd} USD]";
             try
             {
-                var markdownReplyText = _telegramMarkdownConverter.ConvertToTelegramMarkdown(llmResponseText);
-                if (markdownReplyText.Length > 4000)
-                {
-                    markdownReplyText = $"{markdownReplyText[..4000]}\n(response cut)";
-                }
-
+                var finalText = _telegramMarkdownConverter.ConvertToPartedTelegramMarkdown(llmResponseText);
                 if (costInUsd > 0m)
                 {
-                    llmResponseText += $"\n\n{costText}";
+                    finalText[^1] += $"\n\n{costText}";
                     costTextPresent = true;
                 }
 
                 _typingStatusService.StopTyping(command.Message.Chat.Id);
-                var response = await _bot.SendMessage(
-                    command.Message.Chat,
-                    markdownReplyText,
-                    ParseMode.MarkdownV2,
-                    new()
-                    {
-                        MessageId = command.Message.MessageId
-                    },
-                    cancellationToken: cancellationToken);
-                if (!string.IsNullOrEmpty(response.Text))
+                for (var i = 0; i < finalText.Length; i++)
                 {
-                    if (costTextPresent)
+                    var firstPart = i == 0;
+                    var lastPart = i == finalText.Length - 1;
+                    Message response;
+                    if (firstPart)
+                    {
+                        response = await _bot.SendMessage(
+                            command.Message.Chat,
+                            finalText[i],
+                            ParseMode.MarkdownV2,
+                            new()
+                            {
+                                MessageId = command.Message.MessageId
+                            },
+                            cancellationToken: cancellationToken);
+                    }
+                    else
+                    {
+                        response = await _bot.SendMessage(
+                            command.Message.Chat,
+                            finalText[i],
+                            ParseMode.MarkdownV2,
+                            cancellationToken: cancellationToken);
+                    }
+
+                    if (!string.IsNullOrEmpty(response.Text) && costTextPresent && lastPart)
                     {
                         response.Text = response.Text[..^costText.Length].Trim();
                     }
-                }
 
-                await _storage.StoreMessageAsync(response, command.Self, cancellationToken);
+                    await _storage.StoreMessageAsync(response, command.Self, cancellationToken);
+                }
             }
             catch (Exception ex)
             {
                 Log.MarkdownConversionOrSendFailed(_logger, ex);
                 _typingStatusService.StopTyping(command.Message.Chat.Id);
+                var finalText = llmResponseText;
                 if (costInUsd > 0m)
                 {
-                    llmResponseText += $"\n\n{costText}";
+                    finalText += $"\n\n{costText}";
                     costTextPresent = true;
                 }
 
                 var response = await _bot.SendMessage(
                     command.Message.Chat,
-                    llmResponseText,
+                    finalText,
                     ParseMode.None,
                     new()
                     {

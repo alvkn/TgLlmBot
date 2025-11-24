@@ -48,7 +48,7 @@ public class ModelCommandHandler : AbstractCommandHandler<ModelCommand>
         builder.Append("Провайдер: `").Append(baseUri).AppendLine("`");
         builder.Append("Модель: `").Append(model).AppendLine("`");
         var rawMarkdown = builder.ToString();
-        var optimizedMarkdown = markdownConverter.ConvertToTelegramMarkdown(rawMarkdown);
+        var optimizedMarkdown = markdownConverter.ConvertToSolidTelegramMarkdown(rawMarkdown);
         return optimizedMarkdown;
     }
 
