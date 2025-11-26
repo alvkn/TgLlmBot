@@ -458,7 +458,6 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
         var builder = new StringBuilder(basePrompt.Trim());
 
         string? additionalPrompt = null;
-
         if (command.Message.From is not null)
         {
             var personalPrompt = await _systemPrompt.GetUserChatPromptAsync(command.Message.Chat.Id, command.Message.From.Id, cancellationToken);
@@ -479,11 +478,11 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
 
         if (!string.IsNullOrEmpty(additionalPrompt))
         {
-            builder.AppendLine();
+            builder.AppendLine("---");
             builder.AppendLine("Дополнительно пользователь чата, попросил тебя о следующем:");
             builder.AppendLine(additionalPrompt);
-            builder.AppendLine();
-            builder.AppendLine("Эта просьба применяется ТОЛЬКО для того чтобы ответить конкретно ему прямо сейчас! Не нужно использовать эту просьбу для всех ответов!");
+            builder.AppendLine("---");
+            builder.AppendLine("Ты обязан следовать дополнительной просьбе при формировании ответа");
         }
 
         return new(
