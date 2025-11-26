@@ -5,38 +5,38 @@ using System.Threading.Tasks;
 using Telegram.Bot;
 using Telegram.Bot.Types.Enums;
 using TgLlmBot.CommandDispatcher.Abstractions;
-using TgLlmBot.Services.DataAccess;
-using TgLlmBot.Services.Llm.Chat;
+using TgLlmBot.Services.DataAccess.SystemPrompts;
+using TgLlmBot.Services.DataAccess.TelegramMessages;
 
-namespace TgLlmBot.Commands.ResetSystemPrompt;
+namespace TgLlmBot.Commands.ResetPersonalSystemPrompt;
 
-public class ResetSystemPromptCommandHandler : AbstractCommandHandler<ResetSystemPromptCommand>
+public class ResetPersonalSystemPromptCommandHandler : AbstractCommandHandler<ResetPersonalSystemPromptCommand>
 {
     private readonly TelegramBotClient _bot;
-    private readonly ICustomChatSystemPromptService _chatSystemPrompt;
     private readonly ITelegramMessageStorage _storage;
+    private readonly ISystemPromptService _systemPrompt;
 
-    public ResetSystemPromptCommandHandler(TelegramBotClient bot, ICustomChatSystemPromptService chatSystemPrompt, ITelegramMessageStorage storage)
+    public ResetPersonalSystemPromptCommandHandler(TelegramBotClient bot, ISystemPromptService systemPrompt, ITelegramMessageStorage storage)
     {
         ArgumentNullException.ThrowIfNull(bot);
-        ArgumentNullException.ThrowIfNull(chatSystemPrompt);
+        ArgumentNullException.ThrowIfNull(systemPrompt);
         ArgumentNullException.ThrowIfNull(storage);
         _bot = bot;
-        _chatSystemPrompt = chatSystemPrompt;
+        _systemPrompt = systemPrompt;
         _storage = storage;
     }
 
     [SuppressMessage("Design", "CA1031:Do not catch general exception types")]
-    public override async Task HandleAsync(ResetSystemPromptCommand command, CancellationToken cancellationToken)
+    public override async Task HandleAsync(ResetPersonalSystemPromptCommand command, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
-            _chatSystemPrompt.Reset(command.Message.Chat.Id);
+            await _systemPrompt.ResetUserChatPromptAsync(command.Message.Chat.Id, command.Message.From!.Id, cancellationToken);
             var response = await _bot.SendMessage(
                 command.Message.Chat,
-                "👌 Теперь использую стандартный системный промпт",
+                "👌 Теперь для общения с тобой использую стандартный системный промпт",
                 ParseMode.MarkdownV2,
                 new()
                 {

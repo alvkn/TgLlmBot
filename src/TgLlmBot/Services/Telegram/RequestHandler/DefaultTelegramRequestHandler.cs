@@ -8,7 +8,7 @@ using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using TgLlmBot.CommandDispatcher;
-using TgLlmBot.Services.DataAccess;
+using TgLlmBot.Services.DataAccess.KickedUsers;
 
 namespace TgLlmBot.Services.Telegram.RequestHandler;
 

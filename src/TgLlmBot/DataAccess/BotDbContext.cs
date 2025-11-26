@@ -14,13 +14,18 @@ public class BotDbContext : DbContext
 
     public DbSet<DbChatMessage> ChatHistory { get; set; }
 
-    public DbSet<KickedUser> KickedUsers { get; set; }
+    public DbSet<DbKickedUser> KickedUsers { get; set; }
+
+    public DbSet<DbChatSystemPrompt> ChatSystemPrompts { get; set; }
+    public DbSet<DbPersonalChatSystemPrompt> PersonalChatSystemPrompts { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
         modelBuilder.ApplyConfiguration(new DbChatMessageEntityTypeConfiguration());
-        modelBuilder.ApplyConfiguration(new KickedUserEntityTypeConfiguration());
+        modelBuilder.ApplyConfiguration(new DbKickedUserEntityTypeConfiguration());
+        modelBuilder.ApplyConfiguration(new DbChatSystemPromptEntityTypeConfiguration());
+        modelBuilder.ApplyConfiguration(new DbPersonalChatSystemPromptEntityTypeConfiguration());
         base.OnModelCreating(modelBuilder);
     }
 }

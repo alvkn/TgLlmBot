@@ -10,10 +10,12 @@ using TgLlmBot.Commands.Model;
 using TgLlmBot.Commands.Ping;
 using TgLlmBot.Commands.Rating;
 using TgLlmBot.Commands.Repo;
-using TgLlmBot.Commands.ResetSystemPrompt;
-using TgLlmBot.Commands.SetSystemPrompt;
+using TgLlmBot.Commands.ResetChatSystemPrompt;
+using TgLlmBot.Commands.ResetPersonalSystemPrompt;
+using TgLlmBot.Commands.SetChatSystemPrompt;
+using TgLlmBot.Commands.SetPersonalSystemPrompt;
 using TgLlmBot.Commands.Usage;
-using TgLlmBot.Services.DataAccess;
+using TgLlmBot.Services.DataAccess.TelegramMessages;
 using TgLlmBot.Services.Telegram.SelfInformation;
 using RatingCommandHandler = TgLlmBot.Commands.Rating.RatingCommandHandler;
 
@@ -27,58 +29,66 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
         MessageType.Photo
     ];
 
-    private readonly ChatWithLlmCommandHandler _chatWithLlmCommandHandler;
-    private readonly DisplayHelpCommandHandler _displayHelpCommandHandler;
+    private readonly ChatWithLlmCommandHandler _chatWithLlm;
+    private readonly DisplayHelpCommandHandler _displayHelp;
     private readonly ITelegramMessageStorage _messageStorage;
-    private readonly ModelCommandHandler _modelCommandHandler;
+    private readonly ModelCommandHandler _model;
 
     private readonly DefaultTelegramCommandDispatcherOptions _options;
-    private readonly PingCommandHandler _pingCommandHandler;
-    private readonly RatingCommandHandler _ratingCommandHandler;
-    private readonly RepoCommandHandler _repoCommandHandler;
-    private readonly ResetSystemPromptCommandHandler _resetSystemPromptCommandHandler;
-    private readonly ITelegramSelfInformation _selfInformation;
-    private readonly SetSystemPromptCommandHandler _setSystemPromptCommandHandler;
-    private readonly UsageCommandHandler _usageCommandHandler;
+    private readonly PingCommandHandler _ping;
+    private readonly RatingCommandHandler _rating;
+    private readonly RepoCommandHandler _repo;
+    private readonly ResetChatSystemPromptCommandHandler _resetChatSystemPrompt;
+    private readonly ResetPersonalSystemPromptCommandHandler _resetPersonalSystemPrompt;
+    private readonly ITelegramSelfInformation _self;
+    private readonly SetChatSystemPromptCommandHandler _setChatSystemPrompt;
+    private readonly SetPersonalSystemPromptCommandHandler _setPersonalSystemPrompt;
+    private readonly UsageCommandHandler _usage;
 
     public DefaultTelegramCommandDispatcher(
         DefaultTelegramCommandDispatcherOptions options,
-        ITelegramSelfInformation selfInformation,
+        ITelegramSelfInformation self,
         ITelegramMessageStorage messageStorage,
-        DisplayHelpCommandHandler displayHelpCommandHandler,
-        ChatWithLlmCommandHandler chatWithLlmCommandHandler,
-        PingCommandHandler pingCommandHandler,
-        RepoCommandHandler repoCommandHandler,
-        ModelCommandHandler modelCommandHandler,
-        UsageCommandHandler usageCommandHandler,
-        RatingCommandHandler ratingCommandHandler,
-        SetSystemPromptCommandHandler setSystemPromptCommandHandler,
-        ResetSystemPromptCommandHandler resetSystemPromptCommandHandler)
+        DisplayHelpCommandHandler displayHelp,
+        ChatWithLlmCommandHandler chatWithLlm,
+        PingCommandHandler ping,
+        RepoCommandHandler repo,
+        ModelCommandHandler model,
+        UsageCommandHandler usage,
+        RatingCommandHandler rating,
+        SetChatSystemPromptCommandHandler setChatSystemPrompt,
+        ResetChatSystemPromptCommandHandler resetChatSystemPrompt,
+        SetPersonalSystemPromptCommandHandler setPersonalSystemPrompt,
+        ResetPersonalSystemPromptCommandHandler resetPersonalSystemPrompt)
     {
         ArgumentNullException.ThrowIfNull(options);
-        ArgumentNullException.ThrowIfNull(selfInformation);
+        ArgumentNullException.ThrowIfNull(self);
         ArgumentNullException.ThrowIfNull(messageStorage);
-        ArgumentNullException.ThrowIfNull(displayHelpCommandHandler);
-        ArgumentNullException.ThrowIfNull(chatWithLlmCommandHandler);
-        ArgumentNullException.ThrowIfNull(pingCommandHandler);
-        ArgumentNullException.ThrowIfNull(repoCommandHandler);
-        ArgumentNullException.ThrowIfNull(modelCommandHandler);
-        ArgumentNullException.ThrowIfNull(usageCommandHandler);
-        ArgumentNullException.ThrowIfNull(ratingCommandHandler);
-        ArgumentNullException.ThrowIfNull(setSystemPromptCommandHandler);
-        ArgumentNullException.ThrowIfNull(resetSystemPromptCommandHandler);
+        ArgumentNullException.ThrowIfNull(displayHelp);
+        ArgumentNullException.ThrowIfNull(chatWithLlm);
+        ArgumentNullException.ThrowIfNull(ping);
+        ArgumentNullException.ThrowIfNull(repo);
+        ArgumentNullException.ThrowIfNull(model);
+        ArgumentNullException.ThrowIfNull(usage);
+        ArgumentNullException.ThrowIfNull(rating);
+        ArgumentNullException.ThrowIfNull(setChatSystemPrompt);
+        ArgumentNullException.ThrowIfNull(resetChatSystemPrompt);
+        ArgumentNullException.ThrowIfNull(setPersonalSystemPrompt);
+        ArgumentNullException.ThrowIfNull(resetPersonalSystemPrompt);
         _options = options;
-        _selfInformation = selfInformation;
+        _self = self;
         _messageStorage = messageStorage;
-        _displayHelpCommandHandler = displayHelpCommandHandler;
-        _chatWithLlmCommandHandler = chatWithLlmCommandHandler;
-        _pingCommandHandler = pingCommandHandler;
-        _repoCommandHandler = repoCommandHandler;
-        _modelCommandHandler = modelCommandHandler;
-        _usageCommandHandler = usageCommandHandler;
-        _ratingCommandHandler = ratingCommandHandler;
-        _setSystemPromptCommandHandler = setSystemPromptCommandHandler;
-        _resetSystemPromptCommandHandler = resetSystemPromptCommandHandler;
+        _displayHelp = displayHelp;
+        _chatWithLlm = chatWithLlm;
+        _ping = ping;
+        _repo = repo;
+        _model = model;
+        _usage = usage;
+        _rating = rating;
+        _setChatSystemPrompt = setChatSystemPrompt;
+        _resetChatSystemPrompt = resetChatSystemPrompt;
+        _setPersonalSystemPrompt = setPersonalSystemPrompt;
+        _resetPersonalSystemPrompt = resetPersonalSystemPrompt;
     }
 
     public async Task HandleMessageAsync(Message? message, UpdateType type, CancellationToken cancellationToken)
@@ -95,7 +105,7 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
             return;
         }
 
-        var self = _selfInformation.GetSelf();
+        var self = _self.GetSelf();
         await _messageStorage.StoreMessageAsync(message, self, cancellationToken);
         // ReSharper disable once ConditionalAccessQualifierIsNonNullableAccordingToAPIContract
         var rawPrompt = $"{message.Text?.Trim()?.ToLowerInvariant()}";
@@ -104,51 +114,64 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
             case "!help":
                 {
                     var command = new DisplayHelpCommand(message, type);
-                    await _displayHelpCommandHandler.HandleAsync(command, cancellationToken);
+                    await _displayHelp.HandleAsync(command, cancellationToken);
                     return;
                 }
             case "!ping":
                 {
                     var command = new PingCommand(message, type);
-                    await _pingCommandHandler.HandleAsync(command, cancellationToken);
+                    await _ping.HandleAsync(command, cancellationToken);
                     return;
                 }
             case "!repo":
                 {
                     var command = new RepoCommand(message, type);
-                    await _repoCommandHandler.HandleAsync(command, cancellationToken);
+                    await _repo.HandleAsync(command, cancellationToken);
                     return;
                 }
             case "!model":
                 {
                     var command = new ModelCommand(message, type);
-                    await _modelCommandHandler.HandleAsync(command, cancellationToken);
+                    await _model.HandleAsync(command, cancellationToken);
                     return;
                 }
             case "!usage":
                 {
                     var command = new UsageCommand(message, type);
-                    await _usageCommandHandler.HandleAsync(command, cancellationToken);
+                    await _usage.HandleAsync(command, cancellationToken);
                     return;
                 }
             case "!rating":
                 {
                     var command = new RatingCommand(message, type, self);
-                    await _ratingCommandHandler.HandleAsync(command, cancellationToken);
+                    await _rating.HandleAsync(command, cancellationToken);
                     return;
                 }
-            case "!reset":
+            case "!chat_role_reset":
                 {
-                    var command = new ResetSystemPromptCommand(message, type, self);
-                    await _resetSystemPromptCommandHandler.HandleAsync(command, cancellationToken);
+                    var command = new ResetChatSystemPromptCommand(message, type, self);
+                    await _resetChatSystemPrompt.HandleAsync(command, cancellationToken);
+                    return;
+                }
+            case "!personal_role_reset":
+                {
+                    var command = new ResetPersonalSystemPromptCommand(message, type, self);
+                    await _resetPersonalSystemPrompt.HandleAsync(command, cancellationToken);
                     return;
                 }
         }
 
-        if (rawPrompt.StartsWith("!role", StringComparison.Ordinal))
+        if (rawPrompt.StartsWith("!chat_role", StringComparison.Ordinal))
         {
-            var command = new SetSystemPromptCommand(message, type, self);
-            await _setSystemPromptCommandHandler.HandleAsync(command, cancellationToken);
+            var command = new SetChatSystemPromptCommand(message, type, self);
+            await _setChatSystemPrompt.HandleAsync(command, cancellationToken);
+            return;
+        }
+
+        if (rawPrompt.StartsWith("!personal_role", StringComparison.Ordinal))
+        {
+            var command = new SetPersonalSystemPromptCommand(message, type, self);
+            await _setPersonalSystemPrompt.HandleAsync(command, cancellationToken);
             return;
         }
 
@@ -156,7 +179,7 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
         if (message.Chat.Type == ChatType.Private)
         {
             var command = new ChatWithLlmCommand(message, type, self, prompt);
-            await _chatWithLlmCommandHandler.HandleAsync(command, cancellationToken);
+            await _chatWithLlm.HandleAsync(command, cancellationToken);
         }
         else if (message.Chat.Type is ChatType.Group or ChatType.Supergroup)
         {
@@ -164,7 +187,7 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
                 || message.ReplyToMessage?.From?.Id == self.Id)
             {
                 var command = new ChatWithLlmCommand(message, type, self, prompt);
-                await _chatWithLlmCommandHandler.HandleAsync(command, cancellationToken);
+                await _chatWithLlm.HandleAsync(command, cancellationToken);
             }
         }
     }

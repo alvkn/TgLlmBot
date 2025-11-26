@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using Telegram.Bot.Types;
 using TgLlmBot.DataAccess.Models;
 
-namespace TgLlmBot.Services.DataAccess;
+namespace TgLlmBot.Services.DataAccess.TelegramMessages;
 
 public interface ITelegramMessageStorage
 {

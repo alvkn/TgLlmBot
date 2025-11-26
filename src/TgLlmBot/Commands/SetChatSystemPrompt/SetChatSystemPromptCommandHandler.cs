@@ -5,32 +5,32 @@ using System.Threading.Tasks;
 using Telegram.Bot;
 using Telegram.Bot.Types.Enums;
 using TgLlmBot.CommandDispatcher.Abstractions;
-using TgLlmBot.Services.DataAccess;
-using TgLlmBot.Services.Llm.Chat;
+using TgLlmBot.Services.DataAccess.SystemPrompts;
+using TgLlmBot.Services.DataAccess.TelegramMessages;
 
-namespace TgLlmBot.Commands.SetSystemPrompt;
+namespace TgLlmBot.Commands.SetChatSystemPrompt;
 
-public class SetSystemPromptCommandHandler : AbstractCommandHandler<SetSystemPromptCommand>
+public class SetChatSystemPromptCommandHandler : AbstractCommandHandler<SetChatSystemPromptCommand>
 {
     private readonly TelegramBotClient _bot;
-    private readonly ICustomChatSystemPromptService _chatSystemPrompt;
     private readonly ITelegramMessageStorage _storage;
+    private readonly ISystemPromptService _systemPrompt;
 
-    public SetSystemPromptCommandHandler(
+    public SetChatSystemPromptCommandHandler(
         TelegramBotClient bot,
-        ICustomChatSystemPromptService chatSystemPrompt,
+        ISystemPromptService systemPrompt,
         ITelegramMessageStorage storage)
     {
         ArgumentNullException.ThrowIfNull(bot);
-        ArgumentNullException.ThrowIfNull(chatSystemPrompt);
+        ArgumentNullException.ThrowIfNull(systemPrompt);
         ArgumentNullException.ThrowIfNull(storage);
         _bot = bot;
-        _chatSystemPrompt = chatSystemPrompt;
+        _systemPrompt = systemPrompt;
         _storage = storage;
     }
 
     [SuppressMessage("Design", "CA1031:Do not catch general exception types")]
-    public override async Task HandleAsync(SetSystemPromptCommand command, CancellationToken cancellationToken)
+    public override async Task HandleAsync(SetChatSystemPromptCommand command, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
         cancellationToken.ThrowIfCancellationRequested();
@@ -46,7 +46,7 @@ public class SetSystemPromptCommandHandler : AbstractCommandHandler<SetSystemPro
             {
                 var response = await _bot.SendMessage(
                     command.Message.Chat,
-                    "❌ Не удалось поменять системный промпт",
+                    "❌ Не удалось поменять системный промпт чата",
                     ParseMode.MarkdownV2,
                     new()
                     {
@@ -57,10 +57,10 @@ public class SetSystemPromptCommandHandler : AbstractCommandHandler<SetSystemPro
             }
             else
             {
-                _chatSystemPrompt.Set(command.Message.Chat.Id, prompt);
+                await _systemPrompt.SetChatPromptAsync(command.Message.Chat.Id, prompt, cancellationToken);
                 var response = await _bot.SendMessage(
                     command.Message.Chat,
-                    "✅ Системный промпт успешно изменён",
+                    "✅ Системный промпт чата успешно изменён",
                     ParseMode.MarkdownV2,
                     new()
                     {

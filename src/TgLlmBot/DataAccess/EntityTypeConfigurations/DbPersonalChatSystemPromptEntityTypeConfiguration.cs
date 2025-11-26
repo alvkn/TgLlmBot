@@ -5,15 +5,16 @@ using TgLlmBot.DataAccess.Models;
 
 namespace TgLlmBot.DataAccess.EntityTypeConfigurations;
 
-public class KickedUserEntityTypeConfiguration : IEntityTypeConfiguration<KickedUser>
+public class DbPersonalChatSystemPromptEntityTypeConfiguration : IEntityTypeConfiguration<DbPersonalChatSystemPrompt>
 {
-    public void Configure(EntityTypeBuilder<KickedUser> builder)
+    public void Configure(EntityTypeBuilder<DbPersonalChatSystemPrompt> builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.HasKey(x => new
         {
             x.ChatId,
-            x.Id
+            x.UserId
         });
+        builder.Property(x => x.Prompt).HasMaxLength(4096);
     }
 }

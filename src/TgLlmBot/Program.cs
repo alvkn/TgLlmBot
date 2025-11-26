@@ -28,16 +28,19 @@ using TgLlmBot.Commands.Model;
 using TgLlmBot.Commands.Ping;
 using TgLlmBot.Commands.Rating;
 using TgLlmBot.Commands.Repo;
-using TgLlmBot.Commands.ResetSystemPrompt;
-using TgLlmBot.Commands.SetSystemPrompt;
+using TgLlmBot.Commands.ResetChatSystemPrompt;
+using TgLlmBot.Commands.ResetPersonalSystemPrompt;
+using TgLlmBot.Commands.SetChatSystemPrompt;
+using TgLlmBot.Commands.SetPersonalSystemPrompt;
 using TgLlmBot.Commands.Usage;
 using TgLlmBot.Configuration.Options;
 using TgLlmBot.Configuration.TypedConfiguration;
 using TgLlmBot.DataAccess;
 using TgLlmBot.DataAccess.Design;
 using TgLlmBot.Extensions.Configuration;
-using TgLlmBot.Services.DataAccess;
-using TgLlmBot.Services.Llm.Chat;
+using TgLlmBot.Services.DataAccess.KickedUsers;
+using TgLlmBot.Services.DataAccess.SystemPrompts;
+using TgLlmBot.Services.DataAccess.TelegramMessages;
 using TgLlmBot.Services.Mcp.Clients.Brave;
 using TgLlmBot.Services.Mcp.Clients.Github;
 using TgLlmBot.Services.Mcp.Enums;
@@ -175,8 +178,10 @@ public partial class Program
         builder.Services.AddSingleton<UsageCommandHandler>();
         builder.Services.AddSingleton(new RatingCommandHandlerOptions(config.Telegram.BotName));
         builder.Services.AddSingleton<RatingCommandHandler>();
-        builder.Services.AddSingleton<ResetSystemPromptCommandHandler>();
-        builder.Services.AddSingleton<SetSystemPromptCommandHandler>();
+        builder.Services.AddSingleton<ResetChatSystemPromptCommandHandler>();
+        builder.Services.AddSingleton<SetChatSystemPromptCommandHandler>();
+        builder.Services.AddSingleton<ResetPersonalSystemPromptCommandHandler>();
+        builder.Services.AddSingleton<SetPersonalSystemPromptCommandHandler>();
         // Channel to communicate with LLM
         var llmRequestChannel = Channel.CreateBounded<ChatWithLlmCommand>(new BoundedChannelOptions(20)
         {
@@ -233,7 +238,6 @@ public partial class Program
         // LLM Chat
         builder.Services.AddSingleton(new DefaultLlmChatHandlerOptions(config.Telegram.BotName, config.Llm.DefaultResponse));
         builder.Services.AddSingleton<ILlmChatHandler, DefaultLlmChatHandler>();
-        builder.Services.AddSingleton<ICustomChatSystemPromptService, DefaultCustomChatSystemPromptService>();
         // DataAccess
         builder.Services.AddDbContext<BotDbContext>(dbContextOptions =>
         {
@@ -247,6 +251,7 @@ public partial class Program
         });
         builder.Services.AddSingleton<ITelegramMessageStorage, DefaultTelegramMessageStorage>();
         builder.Services.AddSingleton<ITelegramKickedUsersStorage, DefaultTelegramKickedUsersStorage>();
+        builder.Services.AddSingleton<ISystemPromptService, DefaultSystemPromptService>();
         // MCP
         builder.Services.AddSingleton<DefaultMcpToolsProvider>();
         builder.Services.AddSingleton<IMcpToolsProvider>(resolver => resolver.GetRequiredService<DefaultMcpToolsProvider>());

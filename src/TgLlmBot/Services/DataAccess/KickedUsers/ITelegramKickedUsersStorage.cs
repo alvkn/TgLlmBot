@@ -1,7 +1,7 @@
 ﻿using System.Threading;
 using System.Threading.Tasks;
 
-namespace TgLlmBot.Services.DataAccess;
+namespace TgLlmBot.Services.DataAccess.KickedUsers;
 
 public interface ITelegramKickedUsersStorage
 {

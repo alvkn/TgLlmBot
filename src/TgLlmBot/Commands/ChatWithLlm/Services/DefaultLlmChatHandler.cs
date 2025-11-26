@@ -16,8 +16,8 @@ using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using TgLlmBot.DataAccess.Models;
-using TgLlmBot.Services.DataAccess;
-using TgLlmBot.Services.Llm.Chat;
+using TgLlmBot.Services.DataAccess.SystemPrompts;
+using TgLlmBot.Services.DataAccess.TelegramMessages;
 using TgLlmBot.Services.Mcp.Tools;
 using TgLlmBot.Services.OpenAIClient.Costs;
 using TgLlmBot.Services.Telegram.Markdown;
@@ -39,11 +39,12 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
 
     private readonly TelegramBotClient _bot;
     private readonly IChatClient _chatClient;
-    private readonly ICustomChatSystemPromptService _chatSystemPrompt;
     private readonly ICostContextStorage _costContextStorage;
     private readonly ILogger<DefaultLlmChatHandler> _logger;
+
     private readonly DefaultLlmChatHandlerOptions _options;
     private readonly ITelegramMessageStorage _storage;
+    private readonly ISystemPromptService _systemPrompt;
     private readonly ITelegramMarkdownConverter _telegramMarkdownConverter;
     private readonly TimeProvider _timeProvider;
     private readonly IMcpToolsProvider _tools;
@@ -54,36 +55,36 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
         TimeProvider timeProvider,
         TelegramBotClient bot,
         IChatClient chatClient,
+        ISystemPromptService systemPrompt,
         ITelegramMarkdownConverter telegramMarkdownConverter,
         ITelegramMessageStorage storage,
         IMcpToolsProvider tools,
-        ILogger<DefaultLlmChatHandler> logger,
         ICostContextStorage costContextStorage,
         ITypingStatusService typingStatusService,
-        ICustomChatSystemPromptService chatSystemPrompt)
+        ILogger<DefaultLlmChatHandler> logger)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentNullException.ThrowIfNull(bot);
         ArgumentNullException.ThrowIfNull(chatClient);
+        ArgumentNullException.ThrowIfNull(systemPrompt);
         ArgumentNullException.ThrowIfNull(telegramMarkdownConverter);
         ArgumentNullException.ThrowIfNull(storage);
         ArgumentNullException.ThrowIfNull(tools);
-        ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(costContextStorage);
         ArgumentNullException.ThrowIfNull(typingStatusService);
-        ArgumentNullException.ThrowIfNull(chatSystemPrompt);
+        ArgumentNullException.ThrowIfNull(logger);
         _options = options;
         _timeProvider = timeProvider;
         _bot = bot;
         _chatClient = chatClient;
+        _systemPrompt = systemPrompt;
         _telegramMarkdownConverter = telegramMarkdownConverter;
-        _logger = logger;
-        _costContextStorage = costContextStorage;
         _storage = storage;
         _tools = tools;
+        _costContextStorage = costContextStorage;
         _typingStatusService = typingStatusService;
-        _chatSystemPrompt = chatSystemPrompt;
+        _logger = logger;
     }
 
     [SuppressMessage("Design", "CA1031:Do not catch general exception types")]
@@ -276,9 +277,10 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        var systemPrompt = await BuildSystemPromptAsync(command, cancellationToken);
         var llmContext = new List<ChatMessage>
         {
-            BuildSystemPrompt(command)
+            systemPrompt
         };
         var historyContext = BuildHistoryContext(contextMessages);
         if (historyContext.Length > 0)
@@ -420,7 +422,7 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
         return result.ToArray();
     }
 
-    private ChatMessage BuildSystemPrompt(ChatWithLlmCommand command)
+    private async Task<ChatMessage> BuildSystemPromptAsync(ChatWithLlmCommand command, CancellationToken cancellationToken)
     {
         var roundUtcDate = DateTimeOffset.FromUnixTimeSeconds(_timeProvider.GetUtcNow().ToUnixTimeSeconds());
         var formattedDate = roundUtcDate.ToString("O", RuCulture);
@@ -454,11 +456,34 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
                           * Свержение конституционного строя: прямые призывы к действиям (в т.ч. насильственным)
                           """;
         var builder = new StringBuilder(basePrompt.Trim());
-        if (_chatSystemPrompt.TryGetCustomPrompt(command.Message.Chat.Id, out var customPrompt))
+
+        string? additionalPrompt = null;
+
+        if (command.Message.From is not null)
+        {
+            var personalPrompt = await _systemPrompt.GetUserChatPromptAsync(command.Message.Chat.Id, command.Message.From.Id, cancellationToken);
+            if (!personalPrompt.HasError)
+            {
+                additionalPrompt = personalPrompt.Ok;
+            }
+        }
+
+        if (string.IsNullOrEmpty(additionalPrompt))
+        {
+            var chatPrompt = await _systemPrompt.GetChatPromptAsync(command.Message.Chat.Id, cancellationToken);
+            if (!chatPrompt.HasError)
+            {
+                additionalPrompt = chatPrompt.Ok;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(additionalPrompt))
         {
             builder.AppendLine();
-            builder.AppendLine("Дополнительно пользователи чата попросили тебя о следующем:");
-            builder.AppendLine(customPrompt.Trim());
+            builder.AppendLine("Дополнительно пользователь чата, попросил тебя о следующем:");
+            builder.AppendLine(additionalPrompt);
+            builder.AppendLine();
+            builder.AppendLine("Эта просьба применяется ТОЛЬКО для того чтобы ответить конкретно ему прямо сейчас! Не нужно использовать эту просьбу для всех ответов!");
         }
 
         return new(

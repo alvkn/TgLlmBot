@@ -15,7 +15,7 @@ using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using TgLlmBot.CommandDispatcher.Abstractions;
 using TgLlmBot.DataAccess.Models;
-using TgLlmBot.Services.DataAccess;
+using TgLlmBot.Services.DataAccess.TelegramMessages;
 using TgLlmBot.Services.OpenAIClient.Costs;
 using TgLlmBot.Services.Telegram.Markdown;
 using TgLlmBot.Services.Telegram.TypingStatus;
@@ -259,6 +259,12 @@ public class RatingCommandHandler : AbstractCommandHandler<RatingCommand>
             var lastestUserMessage = orderedMessages.FirstOrDefault(x => x.FromUserId == userId);
             if (lastestUserMessage is not null)
             {
+                var messagesCount = contextMessages.Count(x => x.FromUserId == userId);
+                if (messagesCount < 5)
+                {
+                    continue;
+                }
+
                 var name = lastestUserMessage.FromUsername;
                 if (string.IsNullOrWhiteSpace(name))
                 {
