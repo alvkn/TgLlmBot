@@ -59,8 +59,10 @@ public class DisplayHelpCommandHandler : AbstractCommandHandler<DisplayHelpComma
         builder.AppendLine("* `!rating` - измеряет уровень кринжа и показывает рейтинг щитпостеров");
         builder.AppendLine("* `!chat_role` - модифицирует системный промпт по-умолчанию (для всего чата) произвольным образом (например: `!chat_role общайся на древнерусском`)");
         builder.AppendLine("* `!chat_role_reset` - сбрасывает системный промпт по-умолчанию (для всего чата) на стандартный");
+        builder.AppendLine("* `!chat_role_show` - показывает текущий системный промпт по-умолчанию (для всего чата)");
         builder.AppendLine("* `!personal_role` - модифицирует системный промпт для общения конкретно с тобой произвольным образом (например: `!personal_role отвечай кратко`). Имеет приоритет над `!chat_role`");
         builder.AppendLine("* `!personal_role_reset` - сбрасывает системный промпт для общения конкретно с тобой на стандартный");
+        builder.AppendLine("* `!personal_role_show` - показывает текущий системный для общения конкретно с тобой");
         var rawMarkdown = builder.ToString();
         var optimizedMarkdown = markdownConverter.ConvertToSolidTelegramMarkdown(rawMarkdown);
         return optimizedMarkdown;

@@ -11,26 +11,22 @@ public class Result<TOk>
 {
     private Result()
     {
-        HasError = true;
+        IsFailed = true;
     }
 
-    private Result(TOk ok)
+    private Result(TOk value)
     {
-        Ok = ok;
-        HasError = false;
+        Value = value;
+        IsFailed = false;
     }
 
-    /// <summary>
-    ///     Flag indicating the presence of an error.
-    ///     If it returns <see langword="false" />, then the <see cref="Ok" /> property contains the result of a successful operation.
-    /// </summary>
-    [MemberNotNullWhen(false, nameof(Ok))]
-    public bool HasError { get; }
+    [MemberNotNullWhen(false, nameof(Value))]
+    public bool IsFailed { get; }
 
     /// <summary>
     ///     Result of a successful operation execution.
     /// </summary>
-    public TOk? Ok { get; }
+    public TOk? Value { get; }
 
     /// <summary>
     ///     Returns a result indicating the successful completion of the operation.

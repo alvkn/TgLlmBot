@@ -14,6 +14,8 @@ using TgLlmBot.Commands.ResetChatSystemPrompt;
 using TgLlmBot.Commands.ResetPersonalSystemPrompt;
 using TgLlmBot.Commands.SetChatSystemPrompt;
 using TgLlmBot.Commands.SetPersonalSystemPrompt;
+using TgLlmBot.Commands.ShowChatSystemPrompt;
+using TgLlmBot.Commands.ShowPersonalSystemPrompt;
 using TgLlmBot.Commands.Usage;
 using TgLlmBot.Services.DataAccess.TelegramMessages;
 using TgLlmBot.Services.Telegram.SelfInformation;
@@ -33,7 +35,6 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
     private readonly DisplayHelpCommandHandler _displayHelp;
     private readonly ITelegramMessageStorage _messageStorage;
     private readonly ModelCommandHandler _model;
-
     private readonly DefaultTelegramCommandDispatcherOptions _options;
     private readonly PingCommandHandler _ping;
     private readonly RatingCommandHandler _rating;
@@ -43,6 +44,8 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
     private readonly ITelegramSelfInformation _self;
     private readonly SetChatSystemPromptCommandHandler _setChatSystemPrompt;
     private readonly SetPersonalSystemPromptCommandHandler _setPersonalSystemPrompt;
+    private readonly ShowChatSystemPromptCommandHandler _showChatSystemPrompt;
+    private readonly ShowPersonalSystemPromptCommandHandler _showPersonalSystemPrompt;
     private readonly UsageCommandHandler _usage;
 
     public DefaultTelegramCommandDispatcher(
@@ -59,7 +62,9 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
         SetChatSystemPromptCommandHandler setChatSystemPrompt,
         ResetChatSystemPromptCommandHandler resetChatSystemPrompt,
         SetPersonalSystemPromptCommandHandler setPersonalSystemPrompt,
-        ResetPersonalSystemPromptCommandHandler resetPersonalSystemPrompt)
+        ResetPersonalSystemPromptCommandHandler resetPersonalSystemPrompt,
+        ShowChatSystemPromptCommandHandler showChatSystemPrompt,
+        ShowPersonalSystemPromptCommandHandler showPersonalSystemPrompt)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(self);
@@ -75,6 +80,8 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
         ArgumentNullException.ThrowIfNull(resetChatSystemPrompt);
         ArgumentNullException.ThrowIfNull(setPersonalSystemPrompt);
         ArgumentNullException.ThrowIfNull(resetPersonalSystemPrompt);
+        ArgumentNullException.ThrowIfNull(showChatSystemPrompt);
+        ArgumentNullException.ThrowIfNull(showPersonalSystemPrompt);
         _options = options;
         _self = self;
         _messageStorage = messageStorage;
@@ -89,6 +96,8 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
         _resetChatSystemPrompt = resetChatSystemPrompt;
         _setPersonalSystemPrompt = setPersonalSystemPrompt;
         _resetPersonalSystemPrompt = resetPersonalSystemPrompt;
+        _showChatSystemPrompt = showChatSystemPrompt;
+        _showPersonalSystemPrompt = showPersonalSystemPrompt;
     }
 
     public async Task HandleMessageAsync(Message? message, UpdateType type, CancellationToken cancellationToken)
@@ -157,6 +166,18 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
                 {
                     var command = new ResetPersonalSystemPromptCommand(message, type, self);
                     await _resetPersonalSystemPrompt.HandleAsync(command, cancellationToken);
+                    return;
+                }
+            case "!personal_role_show":
+                {
+                    var command = new ShowPersonalSystemPromptCommand(message, type, self);
+                    await _showPersonalSystemPrompt.HandleAsync(command, cancellationToken);
+                    return;
+                }
+            case "!chat_role_show":
+                {
+                    var command = new ShowChatSystemPromptCommand(message, type, self);
+                    await _showChatSystemPrompt.HandleAsync(command, cancellationToken);
                     return;
                 }
         }

@@ -461,18 +461,18 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
         if (command.Message.From is not null)
         {
             var personalPrompt = await _systemPrompt.GetUserChatPromptAsync(command.Message.Chat.Id, command.Message.From.Id, cancellationToken);
-            if (!personalPrompt.HasError)
+            if (!personalPrompt.IsFailed)
             {
-                additionalPrompt = personalPrompt.Ok;
+                additionalPrompt = personalPrompt.Value;
             }
         }
 
         if (string.IsNullOrEmpty(additionalPrompt))
         {
             var chatPrompt = await _systemPrompt.GetChatPromptAsync(command.Message.Chat.Id, cancellationToken);
-            if (!chatPrompt.HasError)
+            if (!chatPrompt.IsFailed)
             {
-                additionalPrompt = chatPrompt.Ok;
+                additionalPrompt = chatPrompt.Value;
             }
         }
 
