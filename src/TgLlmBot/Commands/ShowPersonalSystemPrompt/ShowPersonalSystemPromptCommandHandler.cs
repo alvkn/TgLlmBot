@@ -75,10 +75,6 @@ public class ShowPersonalSystemPromptCommandHandler : AbstractCommandHandler<Sho
                 command.Message.Chat,
                 customPrompt,
                 ParseMode.MarkdownV2,
-                new()
-                {
-                    MessageId = command.Message.MessageId
-                },
                 cancellationToken: cancellationToken);
             await _storage.StoreMessageAsync(okStatusMessage, command.Self, cancellationToken);
             await _storage.StoreMessageAsync(promptMessage, command.Self, cancellationToken);
