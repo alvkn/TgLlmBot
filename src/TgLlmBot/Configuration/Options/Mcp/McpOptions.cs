@@ -12,4 +12,7 @@ public class McpOptions
 
     [Required]
     public McpContext7Options Context7 { get; set; } = default!;
+
+    [Required]
+    public McpBrightDataOptions BrightData { get; set; } = default!;
 }

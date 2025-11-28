@@ -43,6 +43,7 @@ using TgLlmBot.Services.DataAccess.KickedUsers;
 using TgLlmBot.Services.DataAccess.SystemPrompts;
 using TgLlmBot.Services.DataAccess.TelegramMessages;
 using TgLlmBot.Services.Mcp.Clients.Brave;
+using TgLlmBot.Services.Mcp.Clients.BrightData;
 using TgLlmBot.Services.Mcp.Clients.Context7;
 using TgLlmBot.Services.Mcp.Clients.Github;
 using TgLlmBot.Services.Mcp.Enums;
@@ -125,14 +126,17 @@ public partial class Program
             var github = asyncScope.ServiceProvider.GetRequiredKeyedService<McpClient>(McpClientName.Github);
             var brave = asyncScope.ServiceProvider.GetRequiredKeyedService<McpClient>(McpClientName.Brave);
             var context7 = asyncScope.ServiceProvider.GetRequiredKeyedService<McpClient>(McpClientName.Context7);
+            var brightData = asyncScope.ServiceProvider.GetRequiredKeyedService<McpClient>(McpClientName.BrightData);
 
             var githubTools = await github.ListToolsAsync();
             var braveTools = await brave.ListToolsAsync();
             var context7Tools = await context7.ListToolsAsync();
+            var brightDataTools = await brightData.ListToolsAsync();
 
             toolsProvider.AddTools(githubTools);
             toolsProvider.AddTools(braveTools);
             toolsProvider.AddTools(context7Tools);
+            toolsProvider.AddTools(brightDataTools);
         }
     }
 
@@ -292,6 +296,15 @@ public partial class Program
             (resolver, _) =>
             {
                 var githubFactory = resolver.GetRequiredService<IContext7McpClientFactory>();
+                return githubFactory.CreateAsync(CancellationToken.None).GetAwaiter().GetResult();
+            });
+        // MCP - BrightData
+        builder.Services.AddSingleton(new DefaultBrightDataMcpClientFactoryOptions(config.Mcp.BrightData.ApiKey));
+        builder.Services.AddSingleton<IBrightDataMcpClientFactory, DefaultBrightDataMcpClientFactory>();
+        builder.Services.AddKeyedSingleton<McpClient>(McpClientName.BrightData,
+            (resolver, _) =>
+            {
+                var githubFactory = resolver.GetRequiredService<IBrightDataMcpClientFactory>();
                 return githubFactory.CreateAsync(CancellationToken.None).GetAwaiter().GetResult();
             });
         // OpenRouter stats
