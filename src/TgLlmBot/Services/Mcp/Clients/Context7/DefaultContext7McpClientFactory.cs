@@ -1,20 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Client;
 
-namespace TgLlmBot.Services.Mcp.Clients.Brave;
+namespace TgLlmBot.Services.Mcp.Clients.Context7;
 
-public class DefaultBraveMcpClientFactory : IBraveMcpClientFactory
+public class DefaultContext7McpClientFactory : IContext7McpClientFactory
 {
     private readonly ILoggerFactory _loggerFactory;
-    private readonly DefaultBraveMcpClientFactoryOptions _options;
+    private readonly DefaultContext7McpClientFactoryOptions _options;
 
-    public DefaultBraveMcpClientFactory(
-        DefaultBraveMcpClientFactoryOptions options,
+    public DefaultContext7McpClientFactory(
+        DefaultContext7McpClientFactoryOptions options,
         ILoggerFactory loggerFactory)
     {
         ArgumentNullException.ThrowIfNull(options);
@@ -23,24 +22,18 @@ public class DefaultBraveMcpClientFactory : IBraveMcpClientFactory
         _loggerFactory = loggerFactory;
     }
 
-    [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope")]
     public async Task<McpClient> CreateAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var client = await McpClient.CreateAsync(new StdioClientTransport(new()
             {
                 Command = "npx",
-                EnvironmentVariables = new Dictionary<string, string?>
-                {
-                    { "BRAVE_API_KEY", _options.ApiKey },
-                    { "BRAVE_MCP_ENABLED_TOOLS", "brave_web_search brave_news_search" }
-                },
                 Arguments = new List<string>
                 {
                     "-y",
-                    "@brave/brave-search-mcp-server",
-                    "--transport",
-                    "stdio"
+                    "@upstash/context7-mcp",
+                    "--api-key",
+                    _options.ApiKey
                 }
             }, _loggerFactory),
             null,

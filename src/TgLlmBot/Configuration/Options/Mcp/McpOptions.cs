@@ -9,4 +9,7 @@ public class McpOptions
 
     [Required]
     public McpBraveOptions Brave { get; set; } = default!;
+
+    [Required]
+    public McpContext7Options Context7 { get; set; } = default!;
 }

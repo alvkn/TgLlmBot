@@ -2,7 +2,6 @@ using System;
 using System.ClientModel;
 using System.ClientModel.Primitives;
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Channels;
@@ -44,6 +43,7 @@ using TgLlmBot.Services.DataAccess.KickedUsers;
 using TgLlmBot.Services.DataAccess.SystemPrompts;
 using TgLlmBot.Services.DataAccess.TelegramMessages;
 using TgLlmBot.Services.Mcp.Clients.Brave;
+using TgLlmBot.Services.Mcp.Clients.Context7;
 using TgLlmBot.Services.Mcp.Clients.Github;
 using TgLlmBot.Services.Mcp.Enums;
 using TgLlmBot.Services.Mcp.Tools;
@@ -114,6 +114,7 @@ public partial class Program
 
     [SuppressMessage("ReSharper", "ConvertToUsingDeclaration")]
     [SuppressMessage("Style", "IDE0063:Use simple \'using\' statement")]
+    [SuppressMessage("ReSharper", "ConditionalAccessQualifierIsNonNullableAccordingToAPIContract")]
     private static async Task InitializeMcpClientsAsync(IHost host)
     {
         var scopeFactory = host.Services.GetRequiredService<IServiceScopeFactory>();
@@ -123,12 +124,15 @@ public partial class Program
 
             var github = asyncScope.ServiceProvider.GetRequiredKeyedService<McpClient>(McpClientName.Github);
             var brave = asyncScope.ServiceProvider.GetRequiredKeyedService<McpClient>(McpClientName.Brave);
+            var context7 = asyncScope.ServiceProvider.GetRequiredKeyedService<McpClient>(McpClientName.Context7);
 
             var githubTools = await github.ListToolsAsync();
             var braveTools = await brave.ListToolsAsync();
+            var context7Tools = await context7.ListToolsAsync();
 
-            toolsProvider.AddTools(githubTools.Select(x => x.WithDescription($"[github] {x.Description?.Trim()}")));
-            toolsProvider.AddTools(braveTools.Select(x => x.WithDescription($"[brave] {x.Description?.Trim()}")));
+            toolsProvider.AddTools(githubTools);
+            toolsProvider.AddTools(braveTools);
+            toolsProvider.AddTools(context7Tools);
         }
     }
 
@@ -279,6 +283,15 @@ public partial class Program
             (resolver, _) =>
             {
                 var githubFactory = resolver.GetRequiredService<IBraveMcpClientFactory>();
+                return githubFactory.CreateAsync(CancellationToken.None).GetAwaiter().GetResult();
+            });
+        // MCP - Context7
+        builder.Services.AddSingleton(new DefaultContext7McpClientFactoryOptions(config.Mcp.Context7.ApiKey));
+        builder.Services.AddSingleton<IContext7McpClientFactory, DefaultContext7McpClientFactory>();
+        builder.Services.AddKeyedSingleton<McpClient>(McpClientName.Context7,
+            (resolver, _) =>
+            {
+                var githubFactory = resolver.GetRequiredService<IContext7McpClientFactory>();
                 return githubFactory.CreateAsync(CancellationToken.None).GetAwaiter().GetResult();
             });
         // OpenRouter stats
