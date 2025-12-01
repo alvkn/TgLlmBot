@@ -28,10 +28,10 @@ public class DefaultTelegramMarkdownConverter : ITelegramMarkdownConverter
         .UseGenericAttributes() // Must be last as it is one parser that is modifying other parsers
         .Build();
 
-    public string[] ConvertToPartedTelegramMarkdown(string normalMarkdown)
+    public string[] ConvertToPartedTelegramMarkdown(string normalMarkdown, int partLengthLimit)
     {
         var singleDocument = ConvertToSolidTelegramMarkdown(normalMarkdown);
-        var parts = SplitDocumentIntoParts(singleDocument, 3000);
+        var parts = SplitDocumentIntoParts(singleDocument, partLengthLimit);
         return parts;
     }
 

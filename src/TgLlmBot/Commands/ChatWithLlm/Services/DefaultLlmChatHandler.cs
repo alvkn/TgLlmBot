@@ -131,7 +131,7 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
             var markdownCostText = _telegramMarkdownConverter.ConvertToSolidTelegramMarkdown(rawCostText);
             try
             {
-                var finalText = _telegramMarkdownConverter.ConvertToPartedTelegramMarkdown(llmResponseText);
+                var finalText = _telegramMarkdownConverter.ConvertToPartedTelegramMarkdown(llmResponseText, 2000);
                 if (costInUsd > 0m)
                 {
                     finalText[^1] += $"\n\n{markdownCostText}";
@@ -141,6 +141,7 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
                 _typingStatusService.StopTyping(command.Message.Chat.Id);
                 for (var i = 0; i < finalText.Length; i++)
                 {
+                    await Task.Delay(1000, cancellationToken);
                     var firstPart = i == 0;
                     var lastPart = i == finalText.Length - 1;
                     Message response;

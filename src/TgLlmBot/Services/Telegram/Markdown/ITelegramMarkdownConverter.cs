@@ -2,6 +2,6 @@
 
 public interface ITelegramMarkdownConverter
 {
-    string[] ConvertToPartedTelegramMarkdown(string normalMarkdown);
+    string[] ConvertToPartedTelegramMarkdown(string normalMarkdown, int partLengthLimit);
     string ConvertToSolidTelegramMarkdown(string normalMarkdown);
 }
