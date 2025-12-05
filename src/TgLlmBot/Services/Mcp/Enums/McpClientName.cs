@@ -4,6 +4,5 @@ public enum McpClientName
 {
     Github,
     Brave,
-    Context7,
-    BrightData
+    Context7
 }
