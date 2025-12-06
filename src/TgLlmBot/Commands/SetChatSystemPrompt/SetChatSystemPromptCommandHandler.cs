@@ -1,12 +1,16 @@
 ﻿using System;
 using System.Diagnostics.CodeAnalysis;
+using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Telegram.Bot;
+using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using TgLlmBot.CommandDispatcher.Abstractions;
 using TgLlmBot.Services.DataAccess.SystemPrompts;
 using TgLlmBot.Services.DataAccess.TelegramMessages;
+using TgLlmBot.Services.Resources;
 
 namespace TgLlmBot.Commands.SetChatSystemPrompt;
 
@@ -37,16 +41,18 @@ public class SetChatSystemPromptCommandHandler : AbstractCommandHandler<SetChatS
         try
         {
             var prompt = $"{command.Message.Text?.Trim()}".Trim();
-            if (prompt.StartsWith("!role", StringComparison.Ordinal))
+            if (prompt.StartsWith("!chat_role", StringComparison.Ordinal))
             {
-                prompt = prompt["!role".Length..].Trim();
+                prompt = prompt["!chat_role".Length..].Trim();
             }
 
-            if (string.IsNullOrWhiteSpace(prompt))
+            var isAdmin = await IsAdminMessageAsync(command, cancellationToken);
+            if (isAdmin)
             {
+                await _systemPrompt.SetChatPromptAsync(command.Message.Chat.Id, prompt, cancellationToken);
                 var response = await _bot.SendMessage(
                     command.Message.Chat,
-                    "❌ Не удалось поменять системный промпт чата",
+                    "✅ Системный промпт чата успешно изменён",
                     ParseMode.MarkdownV2,
                     new()
                     {
@@ -57,10 +63,10 @@ public class SetChatSystemPromptCommandHandler : AbstractCommandHandler<SetChatS
             }
             else
             {
-                await _systemPrompt.SetChatPromptAsync(command.Message.Chat.Id, prompt, cancellationToken);
-                var response = await _bot.SendMessage(
+                var response = await _bot.SendPhoto(
                     command.Message.Chat,
-                    "✅ Системный промпт чата успешно изменён",
+                    new InputFileStream(new MemoryStream(EmbeddedResources.NoJpg), "no.jpg"),
+                    "❌ Только администраторы могут менять системный промпт чата",
                     ParseMode.MarkdownV2,
                     new()
                     {
@@ -83,5 +89,16 @@ public class SetChatSystemPromptCommandHandler : AbstractCommandHandler<SetChatS
                 cancellationToken: cancellationToken);
             await _storage.StoreMessageAsync(response, command.Self, cancellationToken);
         }
+    }
+
+    private async Task<bool> IsAdminMessageAsync(SetChatSystemPromptCommand command, CancellationToken cancellationToken)
+    {
+        if (command.Message.Chat.Type is ChatType.Group or ChatType.Supergroup && command.Message.From is not null)
+        {
+            var admins = await _bot.GetChatAdministrators(command.Message.Chat, cancellationToken);
+            return admins.Any(x => x.User.Id == command.Message.From.Id);
+        }
+
+        return true;
     }
 }

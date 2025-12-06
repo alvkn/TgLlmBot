@@ -34,9 +34,9 @@ public class SetPersonalSystemPromptCommandHandler : AbstractCommandHandler<SetP
         try
         {
             var prompt = $"{command.Message.Text?.Trim()}".Trim();
-            if (prompt.StartsWith("!role", StringComparison.Ordinal))
+            if (prompt.StartsWith("!personal_role", StringComparison.Ordinal))
             {
-                prompt = prompt["!role".Length..].Trim();
+                prompt = prompt["!personal_role".Length..].Trim();
             }
 
             if (string.IsNullOrWhiteSpace(prompt) || command.Message.From is null)
