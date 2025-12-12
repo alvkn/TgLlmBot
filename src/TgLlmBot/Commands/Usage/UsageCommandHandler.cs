@@ -69,9 +69,9 @@ public class UsageCommandHandler : AbstractCommandHandler<UsageCommand>
         OpenRouterStats keyStats)
     {
         var builder = new StringBuilder();
-        builder.Append("Лимит: ").Append(keyStats.Limit.ToString("F3", CultureInfo.InvariantCulture)).AppendLine(" USD");
-        builder.Append("Использовано: ").Append(keyStats.Usage.ToString("F3", CultureInfo.InvariantCulture)).AppendLine(" USD");
-        builder.Append("Осталось: ").Append(keyStats.Remaining.ToString("F3", CultureInfo.InvariantCulture)).AppendLine(" USD");
+        builder.Append("Лимит (текущий): ").Append(keyStats.Limit.ToString("F3", CultureInfo.InvariantCulture)).AppendLine(" USD");
+        builder.Append("Осталось (от текущего лимита): ").Append(keyStats.Remaining.ToString("F3", CultureInfo.InvariantCulture)).AppendLine(" USD");
+        builder.Append("Использовано (за всё время): ").Append(keyStats.Usage.ToString("F3", CultureInfo.InvariantCulture)).AppendLine(" USD");
         var rawMarkdown = builder.ToString();
         var optimizedMarkdown = markdownConverter.ConvertToSolidTelegramMarkdown(rawMarkdown);
         return optimizedMarkdown;
