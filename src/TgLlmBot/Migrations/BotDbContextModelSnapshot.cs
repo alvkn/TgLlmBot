@@ -17,7 +17,7 @@ namespace TgLlmBot.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.11")
+                .HasAnnotation("ProductVersion", "10.0.1")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -103,6 +103,27 @@ namespace TgLlmBot.Migrations
                     b.ToTable("ChatSystemPrompts");
                 });
 
+            modelBuilder.Entity("TgLlmBot.DataAccess.Models.DbChatUsage", b =>
+                {
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("ChatId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Usage")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Date", "ChatId", "UserId");
+
+                    b.HasIndex("Date");
+
+                    b.ToTable("Usage");
+                });
+
             modelBuilder.Entity("TgLlmBot.DataAccess.Models.DbKickedUser", b =>
                 {
                     b.Property<long>("ChatId")
@@ -131,6 +152,22 @@ namespace TgLlmBot.Migrations
                     b.HasKey("ChatId", "UserId");
 
                     b.ToTable("PersonalChatSystemPrompts");
+                });
+
+            modelBuilder.Entity("TgLlmBot.DataAccess.Models.DbUserLimit", b =>
+                {
+                    b.Property<long>("ChatId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Limit")
+                        .HasColumnType("integer");
+
+                    b.HasKey("ChatId", "UserId");
+
+                    b.ToTable("Limits");
                 });
 #pragma warning restore 612, 618
         }

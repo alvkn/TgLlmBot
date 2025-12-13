@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Encodings.Web;
@@ -15,8 +16,10 @@ using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using TgLlmBot.CommandDispatcher.Abstractions;
 using TgLlmBot.DataAccess.Models;
+using TgLlmBot.Services.DataAccess.Limits;
 using TgLlmBot.Services.DataAccess.TelegramMessages;
 using TgLlmBot.Services.OpenAIClient.Costs;
+using TgLlmBot.Services.Resources;
 using TgLlmBot.Services.Telegram.Markdown;
 using TgLlmBot.Services.Telegram.TypingStatus;
 
@@ -71,7 +74,7 @@ public class RatingCommandHandler : AbstractCommandHandler<RatingCommand>
     private readonly TelegramBotClient _bot;
     private readonly IChatClient _chatClient;
     private readonly ICostContextStorage _costContextStorage;
-
+    private readonly ILlmLimitsService _limits;
     private readonly RatingCommandHandlerOptions _options;
     private readonly ITelegramMessageStorage _storage;
     private readonly ITelegramMarkdownConverter _telegramMarkdownConverter;
@@ -86,7 +89,8 @@ public class RatingCommandHandler : AbstractCommandHandler<RatingCommand>
         ITelegramMessageStorage storage,
         ITelegramMarkdownConverter telegramMarkdownConverter,
         TimeProvider timeProvider,
-        ITypingStatusService typingStatusService)
+        ITypingStatusService typingStatusService,
+        ILlmLimitsService limits)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(bot);
@@ -96,6 +100,7 @@ public class RatingCommandHandler : AbstractCommandHandler<RatingCommand>
         ArgumentNullException.ThrowIfNull(telegramMarkdownConverter);
         ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentNullException.ThrowIfNull(typingStatusService);
+        ArgumentNullException.ThrowIfNull(limits);
         _options = options;
         _bot = bot;
         _chatClient = chatClient;
@@ -104,6 +109,7 @@ public class RatingCommandHandler : AbstractCommandHandler<RatingCommand>
         _telegramMarkdownConverter = telegramMarkdownConverter;
         _timeProvider = timeProvider;
         _typingStatusService = typingStatusService;
+        _limits = limits;
     }
 
 
@@ -116,6 +122,29 @@ public class RatingCommandHandler : AbstractCommandHandler<RatingCommand>
         {
             _costContextStorage.Initialize();
             _typingStatusService.StartTyping(command.Message.Chat.Id);
+            if (command.Message.From?.Id is not null)
+            {
+                var isAllowed = await _limits.IsLLmInteractionAllowedAsync(command.Message.Chat.Id, command.Message.From.Id, cancellationToken);
+                if (!isAllowed)
+                {
+                    _typingStatusService.StopTyping(command.Message.Chat.Id);
+                    var response = await _bot.SendPhoto(
+                        command.Message.Chat,
+                        new InputFileStream(new MemoryStream(EmbeddedResources.StopJpg), "stop.jpg"),
+                        "❌ Превышен лимит сообщений",
+                        ParseMode.MarkdownV2,
+                        new()
+                        {
+                            MessageId = command.Message.MessageId
+                        },
+                        cancellationToken: cancellationToken);
+                    await _storage.StoreMessageAsync(response, command.Self, cancellationToken);
+                    return;
+                }
+
+                await _limits.IncrementUsageAsync(command.Message.Chat.Id, command.Message.From.Id, cancellationToken);
+            }
+
             var contextMessages = await _storage.SelectContextMessagesAsync(
                 command.Message,
                 cancellationToken);

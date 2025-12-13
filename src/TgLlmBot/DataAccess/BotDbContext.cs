@@ -18,6 +18,8 @@ public class BotDbContext : DbContext
 
     public DbSet<DbChatSystemPrompt> ChatSystemPrompts { get; set; }
     public DbSet<DbPersonalChatSystemPrompt> PersonalChatSystemPrompts { get; set; }
+    public DbSet<DbUserLimit> Limits { get; set; }
+    public DbSet<DbChatUsage> Usage { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -26,6 +28,8 @@ public class BotDbContext : DbContext
         modelBuilder.ApplyConfiguration(new DbKickedUserEntityTypeConfiguration());
         modelBuilder.ApplyConfiguration(new DbChatSystemPromptEntityTypeConfiguration());
         modelBuilder.ApplyConfiguration(new DbPersonalChatSystemPromptEntityTypeConfiguration());
+        modelBuilder.ApplyConfiguration(new DbUserLimitsEntityTypeConfiguration());
+        modelBuilder.ApplyConfiguration(new DbChatUsageEntityTypeConfiguration());
         base.OnModelCreating(modelBuilder);
     }
 }

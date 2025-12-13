@@ -13,6 +13,7 @@ using TgLlmBot.Commands.Repo;
 using TgLlmBot.Commands.ResetChatSystemPrompt;
 using TgLlmBot.Commands.ResetPersonalSystemPrompt;
 using TgLlmBot.Commands.SetChatSystemPrompt;
+using TgLlmBot.Commands.SetLimit;
 using TgLlmBot.Commands.SetPersonalSystemPrompt;
 using TgLlmBot.Commands.ShowChatSystemPrompt;
 using TgLlmBot.Commands.ShowPersonalSystemPrompt;
@@ -43,6 +44,7 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
     private readonly ResetPersonalSystemPromptCommandHandler _resetPersonalSystemPrompt;
     private readonly ITelegramSelfInformation _self;
     private readonly SetChatSystemPromptCommandHandler _setChatSystemPrompt;
+    private readonly SetLimitCommandHandler _setLimit;
     private readonly SetPersonalSystemPromptCommandHandler _setPersonalSystemPrompt;
     private readonly ShowChatSystemPromptCommandHandler _showChatSystemPrompt;
     private readonly ShowPersonalSystemPromptCommandHandler _showPersonalSystemPrompt;
@@ -64,7 +66,8 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
         SetPersonalSystemPromptCommandHandler setPersonalSystemPrompt,
         ResetPersonalSystemPromptCommandHandler resetPersonalSystemPrompt,
         ShowChatSystemPromptCommandHandler showChatSystemPrompt,
-        ShowPersonalSystemPromptCommandHandler showPersonalSystemPrompt)
+        ShowPersonalSystemPromptCommandHandler showPersonalSystemPrompt,
+        SetLimitCommandHandler setLimit)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(self);
@@ -82,6 +85,7 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
         ArgumentNullException.ThrowIfNull(resetPersonalSystemPrompt);
         ArgumentNullException.ThrowIfNull(showChatSystemPrompt);
         ArgumentNullException.ThrowIfNull(showPersonalSystemPrompt);
+        ArgumentNullException.ThrowIfNull(setLimit);
         _options = options;
         _self = self;
         _messageStorage = messageStorage;
@@ -98,6 +102,7 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
         _resetPersonalSystemPrompt = resetPersonalSystemPrompt;
         _showChatSystemPrompt = showChatSystemPrompt;
         _showPersonalSystemPrompt = showPersonalSystemPrompt;
+        _setLimit = setLimit;
     }
 
     public async Task HandleMessageAsync(Message? message, UpdateType type, CancellationToken cancellationToken)
@@ -193,6 +198,13 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
         {
             var command = new SetPersonalSystemPromptCommand(message, type, self);
             await _setPersonalSystemPrompt.HandleAsync(command, cancellationToken);
+            return;
+        }
+
+        if (rawPrompt.StartsWith("!set_limit", StringComparison.Ordinal))
+        {
+            var command = new SetLimitCommand(message, type, self);
+            await _setLimit.HandleAsync(command, cancellationToken);
             return;
         }
 

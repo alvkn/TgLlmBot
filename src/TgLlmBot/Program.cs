@@ -30,6 +30,7 @@ using TgLlmBot.Commands.Repo;
 using TgLlmBot.Commands.ResetChatSystemPrompt;
 using TgLlmBot.Commands.ResetPersonalSystemPrompt;
 using TgLlmBot.Commands.SetChatSystemPrompt;
+using TgLlmBot.Commands.SetLimit;
 using TgLlmBot.Commands.SetPersonalSystemPrompt;
 using TgLlmBot.Commands.ShowChatSystemPrompt;
 using TgLlmBot.Commands.ShowPersonalSystemPrompt;
@@ -190,6 +191,7 @@ public partial class Program
         builder.Services.AddSingleton<SetPersonalSystemPromptCommandHandler>();
         builder.Services.AddSingleton<ShowPersonalSystemPromptCommandHandler>();
         builder.Services.AddSingleton<ShowChatSystemPromptCommandHandler>();
+        builder.Services.AddSingleton<SetLimitCommandHandler>();
         // Channel to communicate with LLM
         var llmRequestChannel = Channel.CreateBounded<ChatWithLlmCommand>(new BoundedChannelOptions(20)
         {

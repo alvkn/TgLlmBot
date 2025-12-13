@@ -5,15 +5,17 @@ using TgLlmBot.DataAccess.Models;
 
 namespace TgLlmBot.DataAccess.EntityTypeConfigurations;
 
-public class DbKickedUserEntityTypeConfiguration : IEntityTypeConfiguration<DbKickedUser>
+public class DbChatUsageEntityTypeConfiguration : IEntityTypeConfiguration<DbChatUsage>
 {
-    public void Configure(EntityTypeBuilder<DbKickedUser> builder)
+    public void Configure(EntityTypeBuilder<DbChatUsage> builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.HasKey(x => new
         {
+            x.Date,
             x.ChatId,
             x.UserId
         });
+        builder.HasIndex(x => x.Date);
     }
 }

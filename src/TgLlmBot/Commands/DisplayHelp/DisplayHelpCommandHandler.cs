@@ -63,6 +63,8 @@ public class DisplayHelpCommandHandler : AbstractCommandHandler<DisplayHelpComma
         builder.AppendLine("* `!personal_role` - модифицирует системный промпт для общения конкретно с тобой произвольным образом (например: `!personal_role отвечай кратко`). Имеет приоритет над `!chat_role`");
         builder.AppendLine("* `!personal_role_reset` - сбрасывает системный промпт для общения конкретно с тобой на стандартный");
         builder.AppendLine("* `!personal_role_show` - показывает текущий системный для общения конкретно с тобой");
+        builder.AppendLine(
+            "* `!set_limit` - устанавливает пользователю лимит на общение с LLM (для этого нужно отправить эту команду реплаем на сообщение того, кому нужно установить лимит и указать количество сообщений, которое будет ему доступно в день; например: `!set_limit 5`)");
         var rawMarkdown = builder.ToString();
         var optimizedMarkdown = markdownConverter.ConvertToSolidTelegramMarkdown(rawMarkdown);
         return optimizedMarkdown;

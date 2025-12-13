@@ -5,9 +5,9 @@ using TgLlmBot.DataAccess.Models;
 
 namespace TgLlmBot.DataAccess.EntityTypeConfigurations;
 
-public class DbKickedUserEntityTypeConfiguration : IEntityTypeConfiguration<DbKickedUser>
+public class DbUserLimitsEntityTypeConfiguration : IEntityTypeConfiguration<DbUserLimit>
 {
-    public void Configure(EntityTypeBuilder<DbKickedUser> builder)
+    public void Configure(EntityTypeBuilder<DbUserLimit> builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.HasKey(x => new

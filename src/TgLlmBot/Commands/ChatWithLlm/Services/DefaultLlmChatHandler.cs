@@ -16,10 +16,12 @@ using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using TgLlmBot.DataAccess.Models;
+using TgLlmBot.Services.DataAccess.Limits;
 using TgLlmBot.Services.DataAccess.SystemPrompts;
 using TgLlmBot.Services.DataAccess.TelegramMessages;
 using TgLlmBot.Services.Mcp.Tools;
 using TgLlmBot.Services.OpenAIClient.Costs;
+using TgLlmBot.Services.Resources;
 using TgLlmBot.Services.Telegram.Markdown;
 using TgLlmBot.Services.Telegram.TypingStatus;
 using ChatMessage = Microsoft.Extensions.AI.ChatMessage;
@@ -40,8 +42,8 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
     private readonly TelegramBotClient _bot;
     private readonly IChatClient _chatClient;
     private readonly ICostContextStorage _costContextStorage;
+    private readonly ILlmLimitsService _limits;
     private readonly ILogger<DefaultLlmChatHandler> _logger;
-
     private readonly DefaultLlmChatHandlerOptions _options;
     private readonly ITelegramMessageStorage _storage;
     private readonly ISystemPromptService _systemPrompt;
@@ -61,6 +63,7 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
         IMcpToolsProvider tools,
         ICostContextStorage costContextStorage,
         ITypingStatusService typingStatusService,
+        ILlmLimitsService limits,
         ILogger<DefaultLlmChatHandler> logger)
     {
         ArgumentNullException.ThrowIfNull(options);
@@ -73,6 +76,7 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
         ArgumentNullException.ThrowIfNull(tools);
         ArgumentNullException.ThrowIfNull(costContextStorage);
         ArgumentNullException.ThrowIfNull(typingStatusService);
+        ArgumentNullException.ThrowIfNull(limits);
         ArgumentNullException.ThrowIfNull(logger);
         _options = options;
         _timeProvider = timeProvider;
@@ -84,6 +88,7 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
         _tools = tools;
         _costContextStorage = costContextStorage;
         _typingStatusService = typingStatusService;
+        _limits = limits;
         _logger = logger;
     }
 
@@ -93,10 +98,31 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
         ArgumentNullException.ThrowIfNull(command);
         try
         {
-            _costContextStorage.Initialize();
             Log.ProcessingLlmRequest(_logger, command.Message.From?.Username, command.Message.From?.Id);
-
+            _costContextStorage.Initialize();
             _typingStatusService.StartTyping(command.Message.Chat.Id);
+            if (command.Message.From?.Id is not null)
+            {
+                var isAllowed = await _limits.IsLLmInteractionAllowedAsync(command.Message.Chat.Id, command.Message.From.Id, cancellationToken);
+                if (!isAllowed)
+                {
+                    _typingStatusService.StopTyping(command.Message.Chat.Id);
+                    var response = await _bot.SendPhoto(
+                        command.Message.Chat,
+                        new InputFileStream(new MemoryStream(EmbeddedResources.StopJpg), "stop.jpg"),
+                        "❌ Превышен лимит сообщений",
+                        ParseMode.MarkdownV2,
+                        new()
+                        {
+                            MessageId = command.Message.MessageId
+                        },
+                        cancellationToken: cancellationToken);
+                    await _storage.StoreMessageAsync(response, command.Self, cancellationToken);
+                    return;
+                }
+
+                await _limits.IncrementUsageAsync(command.Message.Chat.Id, command.Message.From.Id, cancellationToken);
+            }
 
             var contextMessages = await _storage.SelectContextMessagesAsync(command.Message, cancellationToken);
             var context = await BuildContextAsync(command, contextMessages, cancellationToken);
@@ -256,6 +282,7 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
 
         return null;
     }
+
 
     private static PhotoSize? SelectPhotoSizeForLlm(PhotoSize[] photo)
     {

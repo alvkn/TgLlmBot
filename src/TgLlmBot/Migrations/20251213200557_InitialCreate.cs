@@ -61,6 +61,19 @@ namespace TgLlmBot.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Limits",
+                columns: table => new
+                {
+                    ChatId = table.Column<long>(type: "bigint", nullable: false),
+                    UserId = table.Column<long>(type: "bigint", nullable: false),
+                    Limit = table.Column<int>(type: "integer", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Limits", x => new { x.ChatId, x.UserId });
+                });
+
+            migrationBuilder.CreateTable(
                 name: "PersonalChatSystemPrompts",
                 columns: table => new
                 {
@@ -71,6 +84,20 @@ namespace TgLlmBot.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_PersonalChatSystemPrompts", x => new { x.ChatId, x.UserId });
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Usage",
+                columns: table => new
+                {
+                    ChatId = table.Column<long>(type: "bigint", nullable: false),
+                    UserId = table.Column<long>(type: "bigint", nullable: false),
+                    Date = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    Usage = table.Column<int>(type: "integer", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Usage", x => new { x.Date, x.ChatId, x.UserId });
                 });
 
             migrationBuilder.CreateIndex(
@@ -89,6 +116,11 @@ namespace TgLlmBot.Migrations
                 name: "idx_chathistory_messageid_chatid",
                 table: "ChatHistory",
                 columns: new[] { "MessageId", "ChatId" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Usage_Date",
+                table: "Usage",
+                column: "Date");
         }
 
         /// <inheritdoc />
@@ -104,7 +136,13 @@ namespace TgLlmBot.Migrations
                 name: "KickedUsers");
 
             migrationBuilder.DropTable(
+                name: "Limits");
+
+            migrationBuilder.DropTable(
                 name: "PersonalChatSystemPrompts");
+
+            migrationBuilder.DropTable(
+                name: "Usage");
         }
     }
 }

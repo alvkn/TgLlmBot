@@ -7,6 +7,7 @@ namespace TgLlmBot.Services.Resources;
 public static class EmbeddedResources
 {
     public static readonly byte[] NoJpg = ReadResource("no.jpg");
+    public static readonly byte[] StopJpg = ReadResource("stop.jpg");
 
     [SuppressMessage("Style", "IDE0063:Use simple \'using\' statement")]
     [SuppressMessage("ReSharper", "ConvertToUsingDeclaration")]
