@@ -28,9 +28,9 @@ public class DefaultLlmLimitsService : ILlmLimitsService
     public async Task IncrementUsageAsync(long chatId, long userId, CancellationToken cancellationToken)
     {
         const string sql = $"""
-                                INSERT INTO "{nameof(BotDbContext.Usage)}" ("{nameof(DbChatUsage.ChatId)}", "{nameof(DbChatUsage.UserId)}", "{nameof(DbChatUsage.Date)}", "{nameof(DbChatUsage.Usage)}")
-                                VALUES (@{nameof(DbChatUsage.ChatId)}, @{nameof(DbChatUsage.UserId)}, @{nameof(DbChatUsage.Date)}, 1)
-                                ON CONFLICT ("{nameof(DbChatUsage.ChatId)}", "{nameof(DbChatUsage.UserId)}", "{nameof(DbChatUsage.Date)}") DO UPDATE SET "{nameof(DbChatUsage.Usage)}" = "{nameof(DbChatUsage.Usage)}" + 1;
+                            INSERT INTO "{nameof(BotDbContext.Usage)}" AS u ("{nameof(DbChatUsage.ChatId)}", "{nameof(DbChatUsage.UserId)}", "{nameof(DbChatUsage.Date)}", "{nameof(DbChatUsage.Used)}")
+                            VALUES (@{nameof(DbChatUsage.ChatId)}, @{nameof(DbChatUsage.UserId)}, @{nameof(DbChatUsage.Date)}, 1)
+                            ON CONFLICT ("{nameof(DbChatUsage.ChatId)}", "{nameof(DbChatUsage.UserId)}", "{nameof(DbChatUsage.Date)}") DO UPDATE SET "{nameof(DbChatUsage.Used)}" = u."{nameof(DbChatUsage.Used)}" + 1;
                             """;
         await using (var asyncScope = _serviceScopeFactory.CreateAsyncScope())
         {
@@ -60,7 +60,7 @@ public class DefaultLlmLimitsService : ILlmLimitsService
                     .FirstOrDefaultAsync(cancellationToken);
                 if (dbDailyUsage is not null)
                 {
-                    return dbDailyUsage.Usage < dbLimits.Limit;
+                    return dbDailyUsage.Used < dbLimits.Limit;
                 }
             }
 

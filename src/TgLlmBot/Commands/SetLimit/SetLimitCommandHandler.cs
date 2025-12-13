@@ -10,6 +10,7 @@ using TgLlmBot.CommandDispatcher.Abstractions;
 using TgLlmBot.Services.DataAccess.Limits;
 using TgLlmBot.Services.DataAccess.TelegramMessages;
 using TgLlmBot.Services.Resources;
+using TgLlmBot.Services.Telegram.Markdown;
 
 namespace TgLlmBot.Commands.SetLimit;
 
@@ -17,16 +18,23 @@ public class SetLimitCommandHandler : AbstractCommandHandler<SetLimitCommand>
 {
     private readonly TelegramBotClient _bot;
     private readonly ILlmLimitsService _limitsService;
+    private readonly ITelegramMarkdownConverter _markdownConverter;
     private readonly ITelegramMessageStorage _storage;
 
-    public SetLimitCommandHandler(TelegramBotClient bot, ITelegramMessageStorage storage, ILlmLimitsService limitsService)
+    public SetLimitCommandHandler(
+        TelegramBotClient bot,
+        ITelegramMessageStorage storage,
+        ILlmLimitsService limitsService,
+        ITelegramMarkdownConverter markdownConverter)
     {
         ArgumentNullException.ThrowIfNull(bot);
         ArgumentNullException.ThrowIfNull(storage);
         ArgumentNullException.ThrowIfNull(limitsService);
+        ArgumentNullException.ThrowIfNull(markdownConverter);
         _bot = bot;
         _storage = storage;
         _limitsService = limitsService;
+        _markdownConverter = markdownConverter;
     }
 
     public override async Task HandleAsync(SetLimitCommand command, CancellationToken cancellationToken)
@@ -70,9 +78,10 @@ public class SetLimitCommandHandler : AbstractCommandHandler<SetLimitCommand>
 
     private async Task ReplyWithMarkdownAsync(SetLimitCommand command, string responseText, CancellationToken cancellationToken)
     {
+        var telegramMarkdown = _markdownConverter.ConvertToSolidTelegramMarkdown(responseText);
         var response = await _bot.SendMessage(
             command.Message.Chat,
-            responseText,
+            telegramMarkdown,
             ParseMode.MarkdownV2,
             new()
             {
@@ -84,10 +93,11 @@ public class SetLimitCommandHandler : AbstractCommandHandler<SetLimitCommand>
 
     private async Task HandleNonAdminAsync(SetLimitCommand command, CancellationToken cancellationToken)
     {
+        var telegramMarkdown = _markdownConverter.ConvertToSolidTelegramMarkdown("❌ Только администраторы могут менять лимиты");
         var response = await _bot.SendPhoto(
             command.Message.Chat,
             new InputFileStream(new MemoryStream(EmbeddedResources.NoJpg), "no.jpg"),
-            "❌ Только администраторы могут менять лимиты",
+            telegramMarkdown,
             ParseMode.MarkdownV2,
             new()
             {

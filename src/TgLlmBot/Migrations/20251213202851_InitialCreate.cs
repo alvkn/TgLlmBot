@@ -93,7 +93,7 @@ namespace TgLlmBot.Migrations
                     ChatId = table.Column<long>(type: "bigint", nullable: false),
                     UserId = table.Column<long>(type: "bigint", nullable: false),
                     Date = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    Usage = table.Column<int>(type: "integer", nullable: false)
+                    Used = table.Column<int>(type: "integer", nullable: false)
                 },
                 constraints: table =>
                 {

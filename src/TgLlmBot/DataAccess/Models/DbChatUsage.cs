@@ -8,16 +8,16 @@ public class DbChatUsage
     {
     }
 
-    public DbChatUsage(long chatId, long userId, DateTime date, int usage)
+    public DbChatUsage(long chatId, long userId, DateTime date, int used)
     {
         ChatId = chatId;
         UserId = userId;
         Date = date;
-        Usage = usage;
+        Used = used;
     }
 
     public long ChatId { get; set; }
     public long UserId { get; set; }
     public DateTime Date { get; set; }
-    public int Usage { get; set; }
+    public int Used { get; set; }
 }

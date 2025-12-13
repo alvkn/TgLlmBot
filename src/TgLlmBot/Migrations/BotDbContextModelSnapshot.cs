@@ -114,7 +114,7 @@ namespace TgLlmBot.Migrations
                     b.Property<long>("UserId")
                         .HasColumnType("bigint");
 
-                    b.Property<int>("Usage")
+                    b.Property<int>("Used")
                         .HasColumnType("integer");
 
                     b.HasKey("Date", "ChatId", "UserId");

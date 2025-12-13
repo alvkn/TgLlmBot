@@ -41,6 +41,7 @@ using TgLlmBot.DataAccess;
 using TgLlmBot.DataAccess.Design;
 using TgLlmBot.Extensions.Configuration;
 using TgLlmBot.Services.DataAccess.KickedUsers;
+using TgLlmBot.Services.DataAccess.Limits;
 using TgLlmBot.Services.DataAccess.SystemPrompts;
 using TgLlmBot.Services.DataAccess.TelegramMessages;
 using TgLlmBot.Services.Mcp.Clients.Brave;
@@ -262,6 +263,7 @@ public partial class Program
         builder.Services.AddSingleton<ITelegramMessageStorage, DefaultTelegramMessageStorage>();
         builder.Services.AddSingleton<ITelegramKickedUsersStorage, DefaultTelegramKickedUsersStorage>();
         builder.Services.AddSingleton<ISystemPromptService, DefaultSystemPromptService>();
+        builder.Services.AddSingleton<ILlmLimitsService, DefaultLlmLimitsService>();
         // MCP
         builder.Services.AddSingleton<DefaultMcpToolsProvider>();
         builder.Services.AddSingleton<IMcpToolsProvider>(resolver => resolver.GetRequiredService<DefaultMcpToolsProvider>());

@@ -12,7 +12,7 @@ using TgLlmBot.DataAccess;
 namespace TgLlmBot.Migrations
 {
     [DbContext(typeof(BotDbContext))]
-    [Migration("20251213200557_InitialCreate")]
+    [Migration("20251213202851_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -117,7 +117,7 @@ namespace TgLlmBot.Migrations
                     b.Property<long>("UserId")
                         .HasColumnType("bigint");
 
-                    b.Property<int>("Usage")
+                    b.Property<int>("Used")
                         .HasColumnType("integer");
 
                     b.HasKey("Date", "ChatId", "UserId");
