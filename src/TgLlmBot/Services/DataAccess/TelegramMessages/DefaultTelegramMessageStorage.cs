@@ -12,6 +12,7 @@ using Npgsql;
 using Telegram.Bot.Types;
 using TgLlmBot.DataAccess;
 using TgLlmBot.DataAccess.Models;
+using TgLlmBot.Utils;
 
 namespace TgLlmBot.Services.DataAccess.TelegramMessages;
 
@@ -135,11 +136,11 @@ public class DefaultTelegramMessageStorage : ITelegramMessageStorage
             message.ReplyToMessage?.Id,
             message.Date,
             message.From?.Id,
-            message.From?.Username,
-            message.From?.FirstName,
-            message.From?.LastName,
-            message.Text,
-            message.Caption,
+            SurrogatePairSanitizer.SanitizeInvalidUtf16(message.From?.Username),
+            SurrogatePairSanitizer.SanitizeInvalidUtf16(message.From?.FirstName),
+            SurrogatePairSanitizer.SanitizeInvalidUtf16(message.From?.LastName),
+            SurrogatePairSanitizer.SanitizeInvalidUtf16(message.Text),
+            SurrogatePairSanitizer.SanitizeInvalidUtf16(message.Caption),
             isSelfMessage);
     }
 }
