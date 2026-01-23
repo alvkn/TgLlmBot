@@ -32,13 +32,6 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
 {
     private static readonly CultureInfo RuCulture = new("ru-RU");
 
-    private static readonly JsonSerializerOptions HistorySerializationOptions = new(JsonSerializerDefaults.General)
-    {
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-        DefaultIgnoreCondition = JsonIgnoreCondition.Never,
-        WriteIndented = false
-    };
-
     private readonly TelegramBotClient _bot;
     private readonly IChatClient _chatClient;
     private readonly ICostContextStorage _costContextStorage;
@@ -410,45 +403,43 @@ public partial class DefaultLlmChatHandler : ILlmChatHandler
             return [];
         }
 
-        var history = contextMessages
-            .Select(x => new JsonHistoryMessage(
-                new DateTimeOffset(x.Date.Ticks, TimeSpan.Zero).ToUniversalTime(),
-                x.MessageId,
-                x.MessageThreadId,
-                x.ReplyToMessageId,
-                x.FromUserId,
-                x.FromUsername?.Trim(),
-                x.FromFirstName?.Trim(),
-                x.FromLastName?.Trim(),
-                (x.Text ?? x.Caption)?.Trim(),
-                x.IsLlmReplyToMessage))
-            .ToArray();
+        var tableBuilder = new StringBuilder();
+        tableBuilder.AppendLine("| DateTimeUtc | MessageId | MessageThreadId | ReplyToMessageId | FromUserId | FromUsername | FromFirstName | FromLastName | Text | IsLlmReplyToMessage |");
+        tableBuilder.AppendLine("|-------------|-----------|-----------------|------------------|------------|--------------|---------------|--------------|------|---------------------|");
 
-        var result = new List<ChatMessage>
+        foreach (var msg in contextMessages)
         {
-            new(ChatRole.User, $"""
-                                Сейчас я тебе пришлю историю чата в формате JSON, где
-                                {nameof(JsonHistoryMessage.DateTimeUtc)} - дата сообщения в UTC,
-                                {nameof(JsonHistoryMessage.MessageId)} - Id сообщения
-                                {nameof(JsonHistoryMessage.MessageThreadId)} - Id сообщения, с которого начался тред с цепочкой реплаев
-                                {nameof(JsonHistoryMessage.ReplyToMessageId)} - Id оригинального сообщения, на которое даётся ответ (реплай)
-                                {nameof(JsonHistoryMessage.FromUserId)} - Id автора сообщения
-                                {nameof(JsonHistoryMessage.FromUsername)} - Username автора сообщения
-                                {nameof(JsonHistoryMessage.FromFirstName)} - Имя автора сообщения
-                                {nameof(JsonHistoryMessage.FromLastName)} - Фамилия автора сообщения
-                                {nameof(JsonHistoryMessage.Text)} - текст сообщения
-                                {nameof(JsonHistoryMessage.IsLlmReplyToMessage)} - флаг, обозначающий то что это ТЫ и отправил это сообщение в ответ кому-то
-                                """)
-        };
-        foreach (var chatHistoryMessage in history)
-        {
-            var json = JsonSerializer.Serialize(chatHistoryMessage, HistorySerializationOptions);
-            result.Add(new(ChatRole.User, json));
+            var dateTimeUtc = new DateTimeOffset(msg.Date.Ticks, TimeSpan.Zero).ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
+            var messageThreadId = msg.MessageThreadId?.ToString(CultureInfo.InvariantCulture) ?? "-";
+            var replyToMessageId = msg.ReplyToMessageId?.ToString(CultureInfo.InvariantCulture) ?? "-";
+            var fromUserId = msg.FromUserId?.ToString(CultureInfo.InvariantCulture) ?? "-";
+            var fromUsername = string.IsNullOrEmpty(msg.FromUsername) ? "-" : $"@{msg.FromUsername.Trim()}";
+            var fromFirstName = string.IsNullOrEmpty(msg.FromFirstName) ? "-" : msg.FromFirstName.Trim().Replace("|", "\\|", StringComparison.InvariantCulture);
+            var fromLastName = string.IsNullOrEmpty(msg.FromLastName) ? "-" : msg.FromLastName.Trim().Replace("|", "\\|", StringComparison.InvariantCulture);
+            var text = (msg.Text ?? msg.Caption)?.Trim().Replace("|", "\\|", StringComparison.InvariantCulture).Replace("\n", " ", StringComparison.InvariantCulture) ?? "-";
+            var isLlmReply = msg.IsLlmReplyToMessage ? "да" : "нет";
+
+            tableBuilder.AppendLine(CultureInfo.InvariantCulture, $"| {dateTimeUtc} | {msg.MessageId} | {messageThreadId} | {replyToMessageId} | {fromUserId} | {fromUsername} | {fromFirstName} | {fromLastName} | {text} | {isLlmReply} |");
         }
 
-        result.Add(new(ChatRole.User,
-            $"При ответе на сообщение пользователя учитывай контекст обсуждений в которых он участвовал (по связке {nameof(JsonHistoryMessage.FromUserId)} + {nameof(JsonHistoryMessage.MessageId)} + {nameof(JsonHistoryMessage.ReplyToMessageId)} или по связке {nameof(JsonHistoryMessage.FromUserId)} + {nameof(JsonHistoryMessage.MessageId)} + {nameof(JsonHistoryMessage.ReplyToMessageId)} + {nameof(JsonHistoryMessage.MessageThreadId)})"));
-        return result.ToArray();
+        var historyMessage = $"""
+            Сейчас я тебе пришлю историю чата в формате Markdown таблицы, где:
+            - DateTimeUtc - дата сообщения в UTC
+            - MessageId - Id сообщения
+            - MessageThreadId - Id сообщения, с которого начался тред с цепочкой реплаев
+            - ReplyToMessageId - Id оригинального сообщения, на которое даётся ответ (реплай)
+            - FromUserId - Id автора сообщения
+            - FromUsername - Username автора сообщения
+            - FromFirstName - Имя автора сообщения
+            - FromLastName - Фамилия автора сообщения
+            - Text - текст сообщения
+            - IsLlmReplyToMessage - флаг, обозначающий то что это ТЫ и отправил это сообщение в ответ кому-то
+
+            {tableBuilder}
+            При ответе на сообщение пользователя учитывай контекст обсуждений в которых он участвовал (по связке FromUserId + MessageId + ReplyToMessageId или по связке FromUserId + MessageId + ReplyToMessageId + MessageThreadId).
+            """;
+
+        return [new(ChatRole.User, historyMessage)];
     }
 
     private async Task<ChatMessage> BuildSystemPromptAsync(ChatWithLlmCommand command, CancellationToken cancellationToken)
