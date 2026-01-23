@@ -216,8 +216,9 @@ public class DefaultTelegramCommandDispatcher : ITelegramCommandDispatcher
         }
         else if (message.Chat.Type is ChatType.Group or ChatType.Supergroup)
         {
+            var isReplyToBot = message.ReplyToMessage?.From?.Id == self.Id && message.Quote is null;
             if (prompt?.StartsWith(_options.BotName, StringComparison.OrdinalIgnoreCase) is true
-                || message.ReplyToMessage?.From?.Id == self.Id)
+                || isReplyToBot)
             {
                 var command = new ChatWithLlmCommand(message, type, self, prompt);
                 await _chatWithLlm.HandleAsync(command, cancellationToken);
